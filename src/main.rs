@@ -1,9 +1,8 @@
-use agent::{Message, OpenAI, UserMessageContent};
+use agent::{Message, OpenAI};
 
 #[tokio::main]
 async fn main() {
-    let (mut client,_) = OpenAI::new();
-    client.add_message(Message::User { content: UserMessageContent::Text { content: "()".into() } });
-    let res = client.await;
-
+    let (mut client, _) = OpenAI::new();
+    client.add_message(Message::user_text("()"));
+    let _res = client.await;
 }

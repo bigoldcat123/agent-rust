@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 pin-project-lite = "0.2.17"
 tokio = { version = "1.52.3", features = ["macros", "rt", "time", "test-util", "rt-multi-thread", "io-util", "fs", "io-std", "net"] }
+async-openai = {path="/Users/dadigua/Desktop/c/async-openai/async-openai",features = ["chat-completion"]}

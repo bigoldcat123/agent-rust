@@ -1,35 +1,15 @@
 use std::{
     ops::{Deref, DerefMut},
-    pin::Pin,
+    pin::{Pin, pin},
     task::{Context, Poll, ready},
 };
 
+use async_openai::{config::OpenAIConfig, types::chat::{CreateChatCompletionRequest, CreateChatCompletionRequestArgs}};
 use pin_project_lite::pin_project;
 
-pub enum UserMessageContent {
-    Text{content:String}
-}
-pub struct ToolCall {
-    pub id: String,
-    pub name: String,
-    pub arguments: String,
-}
+mod message;
+pub use message::{Message, ToolCall, UserMessageContent};
 
-pub enum Message {
-    User { content: UserMessageContent },
-    System {
-        content: String,
-    },
-    Assistant {
-        content: Option<String>,
-        reasoning: Option<String>,
-        tool_calls: Vec<ToolCall>,
-    },
-    Tool {
-        tool_call_id: String,
-        content: String,
-    },
-}
 pub enum Tool {}
 pub enum AgentState {}
 pub enum AgentOutputPart {}
@@ -43,12 +23,13 @@ pub trait ModelClient {
     ) -> Poll<Result<AngentOutput, Self::Error>>;
 }
 
-pub struct OpenAI {
-    output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
+pub struct OpenAI<C> {
+    _output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
     messages: Vec<Message>,
     tools: Vec<Tool>,
+    client: C,
 }
-impl OpenAI {
+impl OpenAI<async_openai::ModelClient<OpenAIConfig>> {
     pub fn new() -> (Client<Self>, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
         Self::equipped(vec![], vec![])
     }
@@ -70,9 +51,10 @@ impl OpenAI {
         (
             Client {
                 inner: Self {
-                    output_part_tx: tx,
+                    _output_part_tx: tx,
                     messages,
                     tools,
+                    client: async_openai::ModelClient::new(),
                 },
             },
             rx,
@@ -85,12 +67,17 @@ impl OpenAI {
         self.tools.push(tool);
     }
 }
-impl ModelClient for OpenAI {
+impl ModelClient for OpenAI<async_openai::ModelClient<OpenAIConfig>> {
     type Error = String;
     fn poll_run_for_result(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<AngentOutput, Self::Error>> {
+        let req = CreateChatCompletionRequestArgs::default().build().expect("msg");
+        let chat = self.client.chat();
+        let stream = chat.create_stream(&req);
+        let res = ready!(pin!(stream).poll(cx));
+
         Poll::Ready(Ok(AngentOutput {}))
     }
 }
