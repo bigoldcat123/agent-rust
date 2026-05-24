@@ -5,7 +5,10 @@ use async_openai::{
 };
 use futures::StreamExt;
 
-use crate::{AgentOutputPart, AngentOutput, Client, Message, Request, ToolCall, error::Error};
+use crate::{
+    AgentOutputPart, AngentOutput, Client, Message, Request, ToolCall,
+    error::{Error, Result},
+};
 
 use super::{Provider, ProviderFuture};
 
@@ -32,11 +35,11 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
         )
     }
 
-    pub fn create_chat_completion_request(&self) -> CreateChatCompletionRequest {
-        let mut r: CreateChatCompletionRequest = (&self.req).into();
+    pub fn create_chat_completion_request(&self) -> Result<CreateChatCompletionRequest> {
+        let mut r: CreateChatCompletionRequest = (&self.req).try_into()?;
         let pre_messages = self.out_messages.iter().map(Into::into).collect::<Vec<_>>();
         r.messages.extend(pre_messages);
-        r
+        Ok(r)
     }
 }
 
@@ -44,7 +47,7 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
     fn run_for_result<'a>(&'a mut self) -> ProviderFuture<'a> {
         Box::pin(async move {
             let chat = self.client.chat();
-            let req = self.create_chat_completion_request();
+            let req = self.create_chat_completion_request()?;
             let mut stream = chat.create_stream(&req).await?;
             let mut reasonging = String::new();
             let mut content = String::new();
@@ -89,7 +92,7 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                                                 })?;
                                             Ok(ToolCall::new(id, name))
                                         })
-                                        .collect::<Result<Vec<_>, Error>>()?;
+                                        .collect::<Result<Vec<_>>>()?;
                             } else {
                                 for (i, t) in call_tools.iter().enumerate() {
                                     if let Some(ref f) = t.function

@@ -8,30 +8,32 @@ use async_openai::types::chat::{
 };
 use serde_json::json;
 
-use crate::{Message, Request, Tool, ToolCall, UserMessageContent};
+use crate::{Message, Request, Tool, ToolCall, UserMessageContent, error::Error};
 
-impl Into<CreateChatCompletionRequest> for &Request {
-    fn into(self) -> CreateChatCompletionRequest {
-        let messages = self.messages.iter().map(Into::into).collect::<Vec<_>>();
+impl TryFrom<&Request> for CreateChatCompletionRequest {
+    type Error = Error;
+
+    fn try_from(value: &Request) -> Result<Self, Self::Error> {
+        let messages = value.messages.iter().map(Into::into).collect::<Vec<_>>();
         let mut args = CreateChatCompletionRequestArgs::default();
-        args.model(self.modle.clone())
+        args.model(value.modle.clone())
             .messages(messages)
             .stream(true);
 
-        if !self.tools.is_empty() {
-            args.tools(self.tools.iter().map(Into::into).collect::<Vec<_>>());
+        if !value.tools.is_empty() {
+            args.tools(value.tools.iter().map(Into::into).collect::<Vec<_>>());
         }
-        if let Some(ref extra) = self.extra {
+        if let Some(ref extra) = value.extra {
             args.extra(extra.clone());
         }
 
-        args.build().expect("msg")
+        Ok(args.build()?)
     }
 }
 
-impl Into<ChatCompletionTools> for &Tool {
-    fn into(self) -> ChatCompletionTools {
-        match self {
+impl From<&Tool> for ChatCompletionTools {
+    fn from(value: &Tool) -> Self {
+        match value {
             Tool::Function {
                 name,
                 description,
@@ -49,9 +51,9 @@ impl Into<ChatCompletionTools> for &Tool {
     }
 }
 
-impl Into<ChatCompletionRequestMessage> for &Message {
-    fn into(self) -> ChatCompletionRequestMessage {
-        match self {
+impl From<&Message> for ChatCompletionRequestMessage {
+    fn from(value: &Message) -> Self {
+        match value {
             Message::User { content } => {
                 ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
                     content: content.into(),
@@ -91,21 +93,21 @@ impl Into<ChatCompletionRequestMessage> for &Message {
     }
 }
 
-impl Into<ChatCompletionRequestUserMessageContent> for &UserMessageContent {
-    fn into(self) -> ChatCompletionRequestUserMessageContent {
-        match self {
+impl From<&UserMessageContent> for ChatCompletionRequestUserMessageContent {
+    fn from(value: &UserMessageContent) -> Self {
+        match value {
             UserMessageContent::Text { content } => content.clone().into(),
         }
     }
 }
 
-impl Into<ChatCompletionMessageToolCalls> for &ToolCall {
-    fn into(self) -> ChatCompletionMessageToolCalls {
+impl From<&ToolCall> for ChatCompletionMessageToolCalls {
+    fn from(value: &ToolCall) -> Self {
         ChatCompletionMessageToolCalls::Function(ChatCompletionMessageToolCall {
-            id: self.id.clone(),
+            id: value.id.clone(),
             function: FunctionCall {
-                name: self.name.clone(),
-                arguments: self.arguments.clone(),
+                name: value.name.clone(),
+                arguments: value.arguments.clone(),
             },
         })
     }
