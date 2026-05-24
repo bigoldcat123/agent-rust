@@ -10,7 +10,9 @@ use serde_json::Value;
 pub use tool::{NoopToolExecutor, ToolExecutor, ToolFn, ToolFuture, ToolOutput, ToolRegistry};
 #[derive(Builder)]
 pub struct Request {
+    #[builder(default)]
     tools: Vec<Tool>,
+    #[builder(default)]
     messages: Vec<Message>,
     #[builder(setter(into, strip_option), default)]
     extra: Option<Value>,
