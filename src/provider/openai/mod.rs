@@ -53,7 +53,8 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
             while let Some(stream) = stream.next().await {
                 match stream {
                     Ok(stream) => {
-                        if let Some(r) = stream.choices[0].delta.extra.get("reasoning_content")
+                        let choice = &stream.choices[0];
+                        if let Some(r) = choice.delta.extra.get("reasoning_content")
                             && let Some(r) = r.as_str()
                         {
                             reasonging.push_str(r);
@@ -62,14 +63,14 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                                 .await
                                 .unwrap();
                         }
-                        if let Some(ref c) = stream.choices[0].delta.content {
+                        if let Some(ref c) = choice.delta.content {
                             content.push_str(c);
                             self._output_part_tx
                                 .send(AgentOutputPart::Content(c.to_string()))
                                 .await
                                 .unwrap();
                         }
-                        if let Some(ref call_tools) = stream.choices[0].delta.tool_calls {
+                        if let Some(ref call_tools) = choice.delta.tool_calls {
                             if tools.is_empty() {
                                 tools = call_tools
                                     .iter()
@@ -134,7 +135,6 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                     Err(_e) => return Err(Error::E),
                 }
             }
-
             Ok(AngentOutput {
                 contents: self.out_messages.clone(),
             })
