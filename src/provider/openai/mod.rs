@@ -1,15 +1,11 @@
 pub mod adaptor;
 use async_openai::{
     config::OpenAIConfig,
-    types::chat::{
-        CreateChatCompletionRequest, FinishReason
-    },
+    types::chat::{CreateChatCompletionRequest, FinishReason},
 };
 use futures::StreamExt;
 
-use crate::{
-    AgentOutputPart, AngentOutput, Client, Message, Request, ToolCall, error::Error,
-};
+use crate::{AgentOutputPart, AngentOutput, Client, Message, Request, ToolCall, error::Error};
 
 use super::{Provider, ProviderFuture};
 
@@ -36,15 +32,9 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
         )
     }
 
-    pub fn create_chat_completion_request(
-        &self,
-    ) -> CreateChatCompletionRequest {
-        let mut r:CreateChatCompletionRequest = (&self.req).into();
-        let pre_messages = self
-            .out_messages
-            .iter()
-            .map(Into::into)
-            .collect::<Vec<_>>();
+    pub fn create_chat_completion_request(&self) -> CreateChatCompletionRequest {
+        let mut r: CreateChatCompletionRequest = (&self.req).into();
+        let pre_messages = self.out_messages.iter().map(Into::into).collect::<Vec<_>>();
         r.messages.extend(pre_messages);
         r
     }

@@ -1,13 +1,3 @@
-use async_openai::types::chat::{
-    ChatCompletionMessageToolCall, ChatCompletionMessageToolCalls,
-    ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
-    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
-    ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage,
-    ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage,
-    ChatCompletionRequestUserMessageContent, FunctionCall,
-};
-use serde_json::json;
-
 #[derive(Clone, Debug)]
 pub enum UserMessageContent {
     Text { content: String },
@@ -85,29 +75,5 @@ impl Message {
             tool_call_id: tool_call_id.into(),
             content: content.into(),
         }
-    }
-}
-
-impl UserMessageContent {
-    pub(crate) fn to_chat_completion_request_user_message_content(
-        &self,
-    ) -> ChatCompletionRequestUserMessageContent {
-        match self {
-            Self::Text { content } => {
-                ChatCompletionRequestUserMessageContent::Text(content.clone())
-            }
-        }
-    }
-}
-
-impl ToolCall {
-    pub fn to_chat_completion_message_tool_call(&self) -> ChatCompletionMessageToolCalls {
-        ChatCompletionMessageToolCalls::Function(ChatCompletionMessageToolCall {
-            id: self.id.clone(),
-            function: FunctionCall {
-                name: self.name.clone(),
-                arguments: self.arguments.clone(),
-            },
-        })
     }
 }

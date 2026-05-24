@@ -1,7 +1,6 @@
 pub mod error;
 mod message;
 pub mod provider;
-use async_openai::types::chat::{CreateChatCompletionRequest, CreateChatCompletionRequestArgs};
 use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
 pub use provider::Provider as ModelClient;
