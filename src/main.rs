@@ -1,11 +1,10 @@
-use agent::{AgentOutputPart, Message, OpenAI, Provider, Request, Tool};
+use agent::{AgentOutputPart, Message, OpenAI, Provider, RequestBuilder, Tool};
 use serde_json::json;
 use tokio::io::{AsyncWriteExt, stdout};
 
 #[tokio::main]
 async fn main() {
-    let mut req = Request::empty();
-    req.add_tool(Tool::function_with_details(
+    let tools = vec![Tool::new(
         "get_weather",
         Some("get the weather info ".to_string()),
         Some(json!({
@@ -19,9 +18,14 @@ async fn main() {
             "required": ["location"]
         })),
         None,
-    ));
-    req.add_message(Message::system(r#"you are a man!"#));
-    req.add_message(Message::user_text("give me the weather in Beijing"));
+    )];
+    let messages = vec![Message::system(r#"you are a man!"#), Message::user_text("give me the weather in Beijing")];
+    let req = RequestBuilder::default()
+        .modle("deepseek-v4-flash")
+        .messages(messages)
+        .tools(tools)
+        .build()
+        .unwrap();
     let (mut client, mut rx) = OpenAI::new(req);
 
     tokio::spawn(async move {

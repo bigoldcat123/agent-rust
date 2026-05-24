@@ -7,6 +7,7 @@ name = "agent"
 version = "0.1.0"
 dependencies = [
  "async-openai",
+ "derive_builder",
  "futures",
  "pin-project-lite",
  "serde_json",

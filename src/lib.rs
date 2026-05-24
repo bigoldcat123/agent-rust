@@ -1,44 +1,23 @@
 pub mod error;
 mod message;
 pub mod provider;
+use async_openai::types::chat::{CreateChatCompletionRequest, CreateChatCompletionRequestArgs};
+use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
 pub use provider::Provider as ModelClient;
 pub use provider::{OpenAI, Provider};
 use serde_json::Value;
+#[derive(Builder)]
 pub struct Request {
     tools: Vec<Tool>,
     messages: Vec<Message>,
+    #[builder(setter(into, strip_option), default)]
     extra: Option<Value>,
+    #[builder(setter(into),default=format!("deepseek-v4-flash"))]
+    modle: String,
 }
-impl Request {
-    pub fn new(tools: Vec<Tool>, messages: Vec<Message>) -> Self {
-        Self {
-            tools,
-            messages,
-            extra: None,
-        }
-    }
 
-    pub fn empty() -> Self {
-        Self::new(vec![], vec![])
-    }
-
-    pub fn with_messages(messages: Vec<Message>) -> Self {
-        Self::new(vec![], messages)
-    }
-
-    pub fn with_tools(tools: Vec<Tool>) -> Self {
-        Self::new(tools, vec![])
-    }
-
-    pub fn add_message(&mut self, message: Message) {
-        self.messages.push(message);
-    }
-
-    pub fn add_tool(&mut self, tool: Tool) {
-        self.tools.push(tool);
-    }
-}
+#[derive(Clone)]
 pub enum Tool {
     Function {
         name: String,
@@ -48,16 +27,7 @@ pub enum Tool {
     },
 }
 impl Tool {
-    pub fn function(name: impl Into<String>) -> Self {
-        Self::Function {
-            name: name.into(),
-            description: None,
-            parameters: None,
-            strict: None,
-        }
-    }
-
-    pub fn function_with_details(
+    pub fn new(
         name: impl Into<String>,
         description: impl Into<Option<String>>,
         parameters: impl Into<Option<serde_json::Value>>,
@@ -71,7 +41,7 @@ impl Tool {
         }
     }
 }
-pub enum AgentState {}
+
 pub enum AgentOutputPart {
     Content(String),
     Reasoning(String),

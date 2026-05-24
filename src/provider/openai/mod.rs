@@ -1,14 +1,14 @@
+pub mod adaptor;
 use async_openai::{
     config::OpenAIConfig,
     types::chat::{
-        ChatCompletionTool, ChatCompletionTools, CreateChatCompletionRequest,
-        CreateChatCompletionRequestArgs, FinishReason, FunctionObject,
+        CreateChatCompletionRequest, FinishReason
     },
 };
 use futures::StreamExt;
 
 use crate::{
-    AgentOutputPart, AngentOutput, Client, Message, Request, Tool, ToolCall, error::Error,
+    AgentOutputPart, AngentOutput, Client, Message, Request, ToolCall, error::Error,
 };
 
 use super::{Provider, ProviderFuture};
@@ -38,37 +38,15 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
 
     pub fn create_chat_completion_request(
         &self,
-        model: impl Into<String>,
     ) -> CreateChatCompletionRequest {
-        let mut messages = self
-            .req
-            .messages
-            .iter()
-            .map(Message::to_chat_completion_request_message)
-            .collect::<Vec<_>>();
+        let mut r:CreateChatCompletionRequest = (&self.req).into();
         let pre_messages = self
             .out_messages
             .iter()
-            .map(Message::to_chat_completion_request_message)
+            .map(Into::into)
             .collect::<Vec<_>>();
-        messages.extend(pre_messages);
-        let mut args = CreateChatCompletionRequestArgs::default();
-        args.model(model.into()).messages(messages).stream(true);
-
-        if !self.req.tools.is_empty() {
-            args.tools(
-                self.req
-                    .tools
-                    .iter()
-                    .map(Tool::to_chat_completion_tool)
-                    .collect::<Vec<_>>(),
-            );
-        }
-        if let Some(ref extra) = self.req.extra {
-            args.extra(extra.clone());
-        }
-
-        args.build().expect("msg")
+        r.messages.extend(pre_messages);
+        r
     }
 }
 
@@ -76,7 +54,7 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
     fn run_for_result<'a>(&'a mut self) -> ProviderFuture<'a> {
         Box::pin(async move {
             let chat = self.client.chat();
-            let req = self.create_chat_completion_request("deepseek-v4-flash");
+            let req = self.create_chat_completion_request();
             let mut stream = chat.create_stream(&req).await.unwrap();
             let mut reasonging = String::new();
             let mut content = String::new();
@@ -184,25 +162,5 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                 contents: self.out_messages.clone(),
             })
         })
-    }
-}
-
-impl Tool {
-    pub(crate) fn to_chat_completion_tool(&self) -> ChatCompletionTools {
-        match self {
-            Self::Function {
-                name,
-                description,
-                parameters,
-                strict,
-            } => ChatCompletionTools::Function(ChatCompletionTool {
-                function: FunctionObject {
-                    name: name.clone(),
-                    description: description.clone(),
-                    parameters: parameters.clone(),
-                    strict: *strict,
-                },
-            }),
-        }
     }
 }

@@ -86,53 +86,6 @@ impl Message {
             content: content.into(),
         }
     }
-
-    pub(crate) fn to_chat_completion_request_message(&self) -> ChatCompletionRequestMessage {
-        match self {
-            Self::User { content } => {
-                ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
-                    content: content.to_chat_completion_request_user_message_content(),
-                    name: None,
-                })
-            }
-            Self::System { content } => {
-                ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
-                    content: ChatCompletionRequestSystemMessageContent::Text(content.clone()),
-                    name: None,
-                })
-            }
-            Self::Assistant {
-                content,
-                reasoning: r,
-                tool_calls,
-            } => ChatCompletionRequestMessage::Assistant(ChatCompletionRequestAssistantMessage {
-                content: content
-                    .clone()
-                    .map(ChatCompletionRequestAssistantMessageContent::Text),
-                tool_calls: (!tool_calls.is_none()).then(|| {
-                    tool_calls
-                        .as_ref()
-                        .unwrap()
-                        .iter()
-                        .map(ToolCall::to_chat_completion_message_tool_call)
-                        .collect()
-                }),
-                extra: r.clone().map(|x| {
-                    json!({
-                        "reasoning_content":x
-                    })
-                }),
-                ..Default::default()
-            }),
-            Self::Tool {
-                tool_call_id,
-                content,
-            } => ChatCompletionRequestMessage::Tool(ChatCompletionRequestToolMessage {
-                tool_call_id: tool_call_id.clone(),
-                content: ChatCompletionRequestToolMessageContent::Text(content.clone()),
-            }),
-        }
-    }
 }
 
 impl UserMessageContent {
