@@ -13,7 +13,7 @@ use crate::{
 use super::{Provider, ProviderFuture};
 
 pub struct OpenAI<C> {
-    _output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
+    output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
     req: Request,
     out_messages: Vec<Message>,
     client: C,
@@ -22,17 +22,21 @@ pub struct OpenAI<C> {
 impl OpenAI<async_openai::Client<OpenAIConfig>> {
     pub fn new(req: Request) -> (Client<Self>, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
         let (tx, rx) = tokio::sync::mpsc::channel::<AgentOutputPart>(100);
-        (
-            Client {
-                inner: Self {
-                    _output_part_tx: tx,
-                    client: async_openai::Client::new(),
-                    req,
-                    out_messages: vec![],
-                },
+        (Self::with_output_part_tx(req, tx), rx)
+    }
+
+    pub fn with_output_part_tx(
+        req: Request,
+        output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
+    ) -> Client<Self> {
+        Client {
+            inner: Self {
+                output_part_tx,
+                client: async_openai::Client::new(),
+                req,
+                out_messages: vec![],
             },
-            rx,
-        )
+        }
     }
 
     pub fn create_chat_completion_request(&self) -> Result<CreateChatCompletionRequest> {
@@ -60,14 +64,14 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                             && let Some(r) = r.as_str()
                         {
                             reasonging.push_str(r);
-                            self._output_part_tx
+                            self.output_part_tx
                                 .send(AgentOutputPart::Reasoning(r.to_string()))
                                 .await
                                 .map_err(|_| Error::OutputClosed)?;
                         }
                         if let Some(ref c) = choice.delta.content {
                             content.push_str(c);
-                            self._output_part_tx
+                            self.output_part_tx
                                 .send(AgentOutputPart::Content(c.to_string()))
                                 .await
                                 .map_err(|_| Error::OutputClosed)?;
@@ -118,7 +122,7 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                                     break;
                                 }
                                 FinishReason::ToolCalls => {
-                                    self._output_part_tx
+                                    self.output_part_tx
                                         .send(AgentOutputPart::Tool(tools.clone()))
                                         .await
                                         .map_err(|_| Error::OutputClosed)?;
