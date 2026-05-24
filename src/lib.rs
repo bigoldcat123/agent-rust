@@ -41,6 +41,12 @@ impl Tool {
             strict,
         }
     }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Function { name, .. } => name,
+        }
+    }
 }
 
 pub enum AgentOutputPart {

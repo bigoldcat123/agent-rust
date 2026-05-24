@@ -27,7 +27,7 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
         (Self::with_output_part_tx(req, tx), rx)
     }
 
-    pub fn with_tool_executor(
+    pub fn with_tool_registory(
         req: Request,
         tool_executor: impl ToolExecutor + 'static,
     ) -> (Client<Self>, tokio::sync::mpsc::Receiver<AgentOutputPart>) {

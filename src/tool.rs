@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::Future, pin::Pin};
 
 use crate::{
-    ToolCall,
+    Tool, ToolCall,
     error::{Error, Result},
 };
 
@@ -65,7 +65,12 @@ where
 
 #[derive(Default)]
 pub struct ToolRegistry {
-    handlers: HashMap<String, Box<dyn ToolExecutor>>,
+    tools: HashMap<String, RegisteredTool>,
+}
+
+struct RegisteredTool {
+    tool: Tool,
+    executor: Box<dyn ToolExecutor>,
 }
 
 impl ToolRegistry {
@@ -73,20 +78,33 @@ impl ToolRegistry {
         Self::default()
     }
 
-    pub fn insert_executor(
-        &mut self,
-        name: impl Into<String>,
-        executor: impl ToolExecutor + 'static,
-    ) {
-        self.handlers.insert(name.into(), Box::new(executor));
+    pub fn insert_executor(&mut self, tool: Tool, executor: impl ToolExecutor + 'static) {
+        self.tools.insert(
+            tool.name().to_string(),
+            RegisteredTool {
+                tool,
+                executor: Box::new(executor),
+            },
+        );
     }
 
-    pub fn insert_fn<F, Fut>(&mut self, name: impl Into<String>, f: F)
+    pub fn insert_fn<F, Fut>(&mut self, tool: Tool, f: F)
     where
         F: FnMut(ToolCall) -> Fut + Send + 'static,
         Fut: Future<Output = Result<ToolOutput>> + Send + 'static,
     {
-        self.insert_executor(name, ToolFn::new(f));
+        self.insert_executor(tool, ToolFn::new(f));
+    }
+
+    pub fn tool(&self, name: &str) -> Option<&Tool> {
+        self.tools.get(name).map(|entry| &entry.tool)
+    }
+
+    pub fn tools(&self) -> Vec<Tool> {
+        self.tools
+            .values()
+            .map(|entry| entry.tool.clone())
+            .collect()
     }
 }
 
@@ -95,10 +113,10 @@ impl ToolExecutor for ToolRegistry {
         Box::pin(async move {
             let name = call.name.clone();
             let handler = self
-                .handlers
+                .tools
                 .get_mut(&name)
                 .ok_or(Error::ToolNotFound { name })?;
-            handler.call(call).await
+            handler.executor.call(call).await
         })
     }
 }
