@@ -16,6 +16,15 @@ pub struct ToolCall {
     pub name: String,
     pub arguments: String,
 }
+impl ToolCall {
+    pub(crate) fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            arguments: String::new(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum Message {

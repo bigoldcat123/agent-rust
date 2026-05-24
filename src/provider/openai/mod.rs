@@ -4,6 +4,7 @@ use async_openai::{
     types::chat::{CreateChatCompletionRequest, FinishReason},
 };
 use futures::StreamExt;
+use tokio::task::id;
 
 use crate::{AgentOutputPart, AngentOutput, Client, Message, Request, ToolCall, error::Error};
 
@@ -73,24 +74,18 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                                 tools = call_tools
                                     .iter()
                                     .map(|x| {
-                                        (
-                                            x.id.clone(),
+                                        ToolCall::new(
+                                            x.id.clone().unwrap(),
                                             x.function.as_ref().unwrap().name.clone().unwrap(),
-                                            String::new(),
                                         )
                                     })
                                     .collect();
                             } else {
                                 for (i, t) in call_tools.iter().enumerate() {
                                     if let Some(ref f) = t.function
-                                        && let Some(ref name) = f.name
-                                    {
-                                        tools[i].1.push_str(name);
-                                    }
-                                    if let Some(ref f) = t.function
                                         && let Some(ref args) = f.arguments
                                     {
-                                        tools[i].2.push_str(args);
+                                        tools[i].arguments.push_str(args);
                                     }
                                 }
                             }
@@ -106,19 +101,11 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                                     break;
                                 }
                                 FinishReason::ToolCalls => {
-                                    let tools = tools
-                                        .into_iter()
-                                        .map(|x| ToolCall {
-                                            id: x.0.unwrap(),
-                                            name: x.1,
-                                            arguments: x.2,
-                                        })
-                                        .collect::<Vec<_>>();
                                     self._output_part_tx
                                         .send(AgentOutputPart::Tool(tools.clone()))
                                         .await
                                         .unwrap();
-
+                                    // TODO call the tools
                                     let tool_res = tools
                                         .iter()
                                         .map(|x| Message::tool(x.id.clone(), "the weather is bad"))

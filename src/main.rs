@@ -21,7 +21,7 @@ async fn main() {
     )];
     let messages = vec![
         Message::system(r#"you are a man!"#),
-        Message::user_text("give me the weather in Beijing"),
+        Message::user_text("北京的天气怎么样？"),
     ];
     let req = RequestBuilder::default()
         .modle("deepseek-v4-flash")
