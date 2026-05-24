@@ -103,8 +103,7 @@ async fn main() {
         .tools(tool_registry.tools())
         .build()
         .unwrap();
-    let (mut client, mut rx) = OpenAI::with_tool_registory(req, tool_registry);
-
+    let (mut client, mut rx) = OpenAI::new(req).with_tool_executor(tool_registry).with_tx();
     tokio::spawn(async move {
         let _res = client.run_for_result().await;
         println!("\n{:?}", _res);
@@ -131,8 +130,8 @@ async fn main() {
                 stdout.flush().await.unwrap();
             }
             AgentOutputPart::Tool(tools) => {
-                for t in tools{
-                    println!("\n{}",t.name);
+                for t in tools {
+                    println!("\n{}", t.name);
                 }
             }
         }

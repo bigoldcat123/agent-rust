@@ -11,10 +11,8 @@ async fn main() {
         .messages(messages)
         .build()
         .unwrap();
-    let (mut client, _) = OpenAI::new(req);
+    let mut client = OpenAI::new(req);
     let res = client.run_for_result().await.unwrap();
     let res = res.contents.last().unwrap();
-    println!("{:?}",res)
-
-
+    println!("{:?}", res)
 }

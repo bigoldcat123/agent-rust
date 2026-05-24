@@ -14,7 +14,7 @@ use crate::{
 use super::{Provider, ProviderFuture};
 
 pub struct OpenAI<C> {
-    output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
+    output_part_tx: Option<tokio::sync::mpsc::Sender<AgentOutputPart>>,
     req: Request,
     out_messages: Vec<Message>,
     client: C,
@@ -22,43 +22,27 @@ pub struct OpenAI<C> {
 }
 
 impl OpenAI<async_openai::Client<OpenAIConfig>> {
-    pub fn new(req: Request) -> (Client<Self>, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
-        let (tx, rx) = tokio::sync::mpsc::channel::<AgentOutputPart>(100);
-        (Self::with_output_part_tx(req, tx), rx)
-    }
-
-    pub fn with_tool_registory(
-        req: Request,
-        tool_executor: impl ToolExecutor + 'static,
-    ) -> (Client<Self>, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
-        let (tx, rx) = tokio::sync::mpsc::channel::<AgentOutputPart>(100);
-        (
-            Self::with_output_part_tx_and_tool_executor(req, tx, tool_executor),
-            rx,
-        )
-    }
-
-    pub fn with_output_part_tx(
-        req: Request,
-        output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
-    ) -> Client<Self> {
-        Self::with_output_part_tx_and_tool_executor(req, output_part_tx, NoopToolExecutor)
-    }
-
-    pub fn with_output_part_tx_and_tool_executor(
-        req: Request,
-        output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
-        tool_executor: impl ToolExecutor + 'static,
-    ) -> Client<Self> {
-        Client {
-            inner: Self {
-                output_part_tx,
-                client: async_openai::Client::new(),
-                req,
-                out_messages: vec![],
-                tool_executor: Box::new(tool_executor),
-            },
+    pub fn new(req: Request) -> Self{
+        Self{
+            output_part_tx:None,
+            req,
+            out_messages: vec![],
+            client: async_openai::Client::new(),
+            tool_executor: Box::new(NoopToolExecutor),
         }
+    }
+
+    pub fn with_tool_executor<T>(mut self, tool_executor: T) -> Self
+    where
+        T: ToolExecutor + 'static,
+    {
+        self.tool_executor = Box::new(tool_executor);
+        self
+    }
+    pub fn with_tx(mut self) -> (Self, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
+        let (tx, rx) = tokio::sync::mpsc::channel(1024);
+        self.output_part_tx = Some(tx);
+        (self, rx)
     }
 
     pub(crate) fn create_chat_completion_request(&self) -> Result<CreateChatCompletionRequest> {
@@ -66,6 +50,16 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
         let pre_messages = self.out_messages.iter().map(Into::into).collect::<Vec<_>>();
         r.messages.extend(pre_messages);
         Ok(r)
+    }
+
+    async fn send_output_part(
+        output_part_tx: Option<tokio::sync::mpsc::Sender<AgentOutputPart>>,
+        part: AgentOutputPart,
+    ) -> Result<()> {
+        if let Some(tx) = output_part_tx {
+            tx.send(part).await.map_err(|_| Error::OutputClosed)?;
+        }
+        Ok(())
     }
 }
 
@@ -86,17 +80,19 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                             && let Some(r) = r.as_str()
                         {
                             reasonging.push_str(r);
-                            self.output_part_tx
-                                .send(AgentOutputPart::Reasoning(r.to_string()))
-                                .await
-                                .map_err(|_| Error::OutputClosed)?;
+                            Self::send_output_part(
+                                self.output_part_tx.clone(),
+                                AgentOutputPart::Reasoning(r.to_string()),
+                            )
+                            .await?;
                         }
                         if let Some(ref c) = choice.delta.content {
                             content.push_str(c);
-                            self.output_part_tx
-                                .send(AgentOutputPart::Content(c.to_string()))
-                                .await
-                                .map_err(|_| Error::OutputClosed)?;
+                            Self::send_output_part(
+                                self.output_part_tx.clone(),
+                                AgentOutputPart::Content(c.to_string()),
+                            )
+                            .await?;
                         }
                         if let Some(ref call_tools) = choice.delta.tool_calls {
                             if tools.is_empty() {
@@ -144,10 +140,11 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                                     break;
                                 }
                                 FinishReason::ToolCalls => {
-                                    self.output_part_tx
-                                        .send(AgentOutputPart::Tool(tools.clone()))
-                                        .await
-                                        .map_err(|_| Error::OutputClosed)?;
+                                    Self::send_output_part(
+                                        self.output_part_tx.clone(),
+                                        AgentOutputPart::Tool(tools.clone()),
+                                    )
+                                    .await?;
                                     let mut tool_res = Vec::with_capacity(tools.len());
                                     for tool in tools.iter().cloned() {
                                         let output = self.tool_executor.call(tool).await?;
