@@ -1,9 +1,14 @@
-use agent::{AgentOutputPart, Message, OpenAI, Provider, RequestBuilder, Tool};
+use agent::{
+    AgentOutputPart, Message, NoopToolExecutor, OpenAI, Provider, RequestBuilder, Tool,
+    ToolExecutor, ToolFn, ToolOutput, ToolRegistry,
+};
 use serde_json::json;
 use tokio::io::{AsyncWriteExt, stdout};
 
 #[tokio::main]
 async fn main() {
+    let mut tool_executor = ToolRegistry::new();
+
     let tools = vec![Tool::new(
         "get_weather",
         Some("get the weather info ".to_string()),

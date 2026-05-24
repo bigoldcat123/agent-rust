@@ -8,6 +8,7 @@ use futures::StreamExt;
 use crate::{
     AgentOutputPart, AngentOutput, Client, Message, Request, ToolCall,
     error::{Error, Result},
+    tool::{NoopToolExecutor, ToolExecutor},
 };
 
 use super::{Provider, ProviderFuture};
@@ -17,6 +18,7 @@ pub struct OpenAI<C> {
     req: Request,
     out_messages: Vec<Message>,
     client: C,
+    tool_executor: Box<dyn ToolExecutor>,
 }
 
 impl OpenAI<async_openai::Client<OpenAIConfig>> {
@@ -25,9 +27,28 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
         (Self::with_output_part_tx(req, tx), rx)
     }
 
+    pub fn with_tool_executor(
+        req: Request,
+        tool_executor: impl ToolExecutor + 'static,
+    ) -> (Client<Self>, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
+        let (tx, rx) = tokio::sync::mpsc::channel::<AgentOutputPart>(100);
+        (
+            Self::with_output_part_tx_and_tool_executor(req, tx, tool_executor),
+            rx,
+        )
+    }
+
     pub fn with_output_part_tx(
         req: Request,
         output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
+    ) -> Client<Self> {
+        Self::with_output_part_tx_and_tool_executor(req, output_part_tx, NoopToolExecutor)
+    }
+
+    pub fn with_output_part_tx_and_tool_executor(
+        req: Request,
+        output_part_tx: tokio::sync::mpsc::Sender<AgentOutputPart>,
+        tool_executor: impl ToolExecutor + 'static,
     ) -> Client<Self> {
         Client {
             inner: Self {
@@ -35,11 +56,12 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
                 client: async_openai::Client::new(),
                 req,
                 out_messages: vec![],
+                tool_executor: Box::new(tool_executor),
             },
         }
     }
 
-    pub fn create_chat_completion_request(&self) -> Result<CreateChatCompletionRequest> {
+    pub(crate) fn create_chat_completion_request(&self) -> Result<CreateChatCompletionRequest> {
         let mut r: CreateChatCompletionRequest = (&self.req).try_into()?;
         let pre_messages = self.out_messages.iter().map(Into::into).collect::<Vec<_>>();
         r.messages.extend(pre_messages);
@@ -126,11 +148,14 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                                         .send(AgentOutputPart::Tool(tools.clone()))
                                         .await
                                         .map_err(|_| Error::OutputClosed)?;
-                                    // TODO call the tools
-                                    let tool_res = tools
-                                        .iter()
-                                        .map(|x| Message::tool(x.id.clone(), "the weather is bad"))
-                                        .collect::<Vec<_>>();
+                                    let mut tool_res = Vec::with_capacity(tools.len());
+                                    for tool in tools.iter().cloned() {
+                                        let output = self.tool_executor.call(tool).await?;
+                                        tool_res.push(Message::tool(
+                                            output.tool_call_id,
+                                            output.content,
+                                        ));
+                                    }
 
                                     self.out_messages.push(Message::Assistant {
                                         content: if content.is_empty() {

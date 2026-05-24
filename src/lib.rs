@@ -1,11 +1,13 @@
 pub mod error;
 mod message;
 pub mod provider;
+pub mod tool;
 use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
 pub use provider::Provider as ModelClient;
 pub use provider::{OpenAI, Provider};
 use serde_json::Value;
+pub use tool::{NoopToolExecutor, ToolExecutor, ToolFn, ToolFuture, ToolOutput, ToolRegistry};
 #[derive(Builder)]
 pub struct Request {
     tools: Vec<Tool>,

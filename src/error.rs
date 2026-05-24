@@ -18,4 +18,17 @@ pub enum Error {
 
     #[error("tool call delta at index {index} has no accumulated tool call")]
     ToolCallDeltaOutOfBounds { index: usize },
+
+    #[error("tool `{name}` not found")]
+    ToolNotFound { name: String },
+
+    #[error("tool `{name}` failed: {message}")]
+    ToolFailed { name: String, message: String },
+
+    #[error("invalid tool arguments for `{name}`: {source}")]
+    InvalidToolArguments {
+        name: String,
+        #[source]
+        source: serde_json::Error,
+    },
 }
