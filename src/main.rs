@@ -1,4 +1,4 @@
-use agent::{AgentOutputPart, Message, ModelClient, OpenAI, Request, Tool};
+use agent::{AgentOutputPart, Message, OpenAI, Provider, Request, Tool};
 use serde_json::json;
 use tokio::io::{AsyncWriteExt, stdout};
 
@@ -24,10 +24,9 @@ async fn main() {
     req.add_message(Message::user_text("give me the weather in Beijing"));
     let (mut client, mut rx) = OpenAI::new(req);
 
-
     tokio::spawn(async move {
         let _res = client.run_for_result().await;
-        println!("\n{:?}",_res);
+        println!("\n{:?}", _res);
     });
     let mut is_reasoning = false;
     let mut stdout = stdout();

@@ -8,7 +8,7 @@ use async_openai::types::chat::{
 };
 use serde_json::json;
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub enum UserMessageContent {
     Text { content: String },
 }
@@ -20,14 +20,14 @@ impl UserMessageContent {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub arguments: String,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub enum Message {
     User {
         content: UserMessageContent,
@@ -110,14 +110,18 @@ impl Message {
                     .clone()
                     .map(ChatCompletionRequestAssistantMessageContent::Text),
                 tool_calls: (!tool_calls.is_none()).then(|| {
-                    tool_calls.as_ref().unwrap()
+                    tool_calls
+                        .as_ref()
+                        .unwrap()
                         .iter()
                         .map(ToolCall::to_chat_completion_message_tool_call)
                         .collect()
                 }),
-                extra:r.clone().map(|x| json!({
-                    "reasoning_content":x
-                })),
+                extra: r.clone().map(|x| {
+                    json!({
+                        "reasoning_content":x
+                    })
+                }),
                 ..Default::default()
             }),
             Self::Tool {
