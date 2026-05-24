@@ -6,8 +6,7 @@ use std::{
 use async_openai::{
     config::OpenAIConfig,
     types::chat::{
-        ChatCompletionTool, ChatCompletionTools, CreateChatCompletionRequest,
-        CreateChatCompletionRequestArgs, FunctionObject,
+        ChatCompletionTool, ChatCompletionTools, CreateChatCompletionRequest, CreateChatCompletionRequestArgs, FinishReason, FunctionObject
     },
 };
 use futures::StreamExt;
@@ -15,13 +14,15 @@ pub mod error;
 
 mod message;
 pub use message::{Message, ToolCall, UserMessageContent};
+use serde_json::{Value, json};
 pub struct Request {
     tools: Vec<Tool>,
     messages: Vec<Message>,
+    extra:Option<Value>
 }
 impl Request {
     pub fn new(tools: Vec<Tool>, messages: Vec<Message>) -> Self {
-        Self { tools, messages }
+        Self { tools, messages ,extra:None}
     }
 
     pub fn empty() -> Self {
@@ -96,11 +97,13 @@ impl Tool {
 }
 pub enum AgentState {}
 pub enum AgentOutputPart {
-    Text(String),
+    Content(String),
     Reasoning(String),
     Tool(ToolCall)
 }
-pub struct AngentOutput {}
+pub struct AngentOutput {
+    contents:Vec<Message>
+}
 
 type ModelClientFuture<'a> =
     Pin<Box<dyn Future<Output = Result<AngentOutput, crate::error::Error>> + 'a + Send>>;
@@ -157,6 +160,9 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
                     .collect::<Vec<_>>(),
             );
         }
+        if let Some(ref extra) = self.req.extra  {
+            args.extra(extra.clone());
+        }
 
         args.build().expect("msg")
     }
@@ -165,20 +171,57 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
 impl ModelClient for OpenAI<async_openai::Client<OpenAIConfig>> {
     fn run_for_result<'a>(&'a mut self) -> ModelClientFuture<'a> {
         Box::pin(async move {
+            let mut out_messages = vec![];
             let chat = self.client.chat();
             let req = self.create_chat_completion_request("deepseek-v4-flash");
             let mut stream = chat.create_stream(&req).await.unwrap();
+            let mut reasonging = String::new();
+            let mut content = String::new();
+            let mut tools = vec![];
             while let Some(stream) = stream.next().await {
                 match stream {
-                    Ok(stream) => {
-                        println!("{:?}", stream.choices[0].delta.content);
-                        println!("{:?}", stream.choices[0].delta.extra);
+                    Ok( stream) => {
+                        if let Some(r) = stream.choices[0].delta.extra.get("reasoning_content") && let Some(r) = r.as_str() {
+                            reasonging.push_str(r);
+                            self._output_part_tx.send(AgentOutputPart::Reasoning(r.to_string())).await.unwrap();
+                        }
+                        if let Some(ref c) = stream.choices[0].delta.content {
+                            content.push_str(c);
+                            self._output_part_tx.send(AgentOutputPart::Content(c.to_string())).await.unwrap();
+                        }
+                        if let Some(ref call_tools) = stream.choices[0].delta.tool_calls {
+                            if tools.is_empty() {
+                                tools = call_tools.iter().map(|x| (x.id.clone(),String::new(),String::new())).collect();
+                            }else {
+                                for (i,t) in call_tools.iter().enumerate() {
+                                    if let Some(ref f) = t.function && let Some(ref name) = f.name {
+                                        tools[i].1.push_str(name);
+                                    }
+                                    if let Some(ref f) = t.function && let Some(ref args) = f.arguments {
+                                        tools[i].2.push_str(args);
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(finish_reason) = &stream.choices[0].finish_reason {
+                            match finish_reason {
+                                FinishReason::Stop => {
+
+                                }
+                                FinishReason::ToolCalls =>{
+
+                                }
+                                _ => {
+
+                                }
+                            }
+                        }
                     }
                     Err(_e) => return Err(crate::error::Error::E),
                 }
             }
 
-            Ok(AngentOutput {})
+            Ok(AngentOutput {contents:out_messages})
         })
     }
 }

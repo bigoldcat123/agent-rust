@@ -83,7 +83,7 @@ impl Message {
         }
     }
 
-    pub fn to_chat_completion_request_message(&self) -> ChatCompletionRequestMessage {
+    pub(crate) fn to_chat_completion_request_message(&self) -> ChatCompletionRequestMessage {
         match self {
             Self::User { content } => {
                 ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
@@ -125,7 +125,7 @@ impl Message {
 }
 
 impl UserMessageContent {
-    pub fn to_chat_completion_request_user_message_content(
+    pub(crate) fn to_chat_completion_request_user_message_content(
         &self,
     ) -> ChatCompletionRequestUserMessageContent {
         match self {
