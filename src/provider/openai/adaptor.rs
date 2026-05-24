@@ -70,7 +70,9 @@ impl Into<ChatCompletionRequestMessage> for &Message {
                 tool_calls,
             } => ChatCompletionRequestMessage::Assistant(ChatCompletionRequestAssistantMessage {
                 content: content.clone().map(Into::into),
-                tool_calls: tool_calls.as_ref().map(|x| x.iter().map(Into::into).collect()),
+                tool_calls: tool_calls
+                    .as_ref()
+                    .map(|x| x.iter().map(Into::into).collect()),
                 extra: r.clone().map(|x| {
                     json!({
                         "reasoning_content":x

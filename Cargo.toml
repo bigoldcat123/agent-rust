@@ -11,3 +11,4 @@ async-openai = {path="/Users/dadigua/Desktop/c/async-openai/async-openai",featur
 futures = "0.3.32"
 tower = "0.5.3"
 derive_builder = "0.20.2"
+thiserror = "2"
