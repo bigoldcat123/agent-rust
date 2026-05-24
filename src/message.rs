@@ -1,3 +1,12 @@
+use async_openai::types::chat::{
+    ChatCompletionMessageToolCall, ChatCompletionMessageToolCalls,
+    ChatCompletionRequestAssistantMessage, ChatCompletionRequestAssistantMessageContent,
+    ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
+    ChatCompletionRequestSystemMessageContent, ChatCompletionRequestToolMessage,
+    ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage,
+    ChatCompletionRequestUserMessageContent, FunctionCall,
+};
+
 pub enum UserMessageContent {
     Text { content: String },
 }
@@ -72,5 +81,69 @@ impl Message {
             tool_call_id: tool_call_id.into(),
             content: content.into(),
         }
+    }
+
+    pub fn to_chat_completion_request_message(&self) -> ChatCompletionRequestMessage {
+        match self {
+            Self::User { content } => {
+                ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
+                    content: content.to_chat_completion_request_user_message_content(),
+                    name: None,
+                })
+            }
+            Self::System { content } => {
+                ChatCompletionRequestMessage::System(ChatCompletionRequestSystemMessage {
+                    content: ChatCompletionRequestSystemMessageContent::Text(content.clone()),
+                    name: None,
+                })
+            }
+            Self::Assistant {
+                content,
+                reasoning: _,
+                tool_calls,
+            } => ChatCompletionRequestMessage::Assistant(ChatCompletionRequestAssistantMessage {
+                content: content
+                    .clone()
+                    .map(ChatCompletionRequestAssistantMessageContent::Text),
+                tool_calls: (!tool_calls.is_empty()).then(|| {
+                    tool_calls
+                        .iter()
+                        .map(ToolCall::to_chat_completion_message_tool_call)
+                        .collect()
+                }),
+                ..Default::default()
+            }),
+            Self::Tool {
+                tool_call_id,
+                content,
+            } => ChatCompletionRequestMessage::Tool(ChatCompletionRequestToolMessage {
+                tool_call_id: tool_call_id.clone(),
+                content: ChatCompletionRequestToolMessageContent::Text(content.clone()),
+            }),
+        }
+    }
+}
+
+impl UserMessageContent {
+    pub fn to_chat_completion_request_user_message_content(
+        &self,
+    ) -> ChatCompletionRequestUserMessageContent {
+        match self {
+            Self::Text { content } => {
+                ChatCompletionRequestUserMessageContent::Text(content.clone())
+            }
+        }
+    }
+}
+
+impl ToolCall {
+    pub fn to_chat_completion_message_tool_call(&self) -> ChatCompletionMessageToolCalls {
+        ChatCompletionMessageToolCalls::Function(ChatCompletionMessageToolCall {
+            id: self.id.clone(),
+            function: FunctionCall {
+                name: self.name.clone(),
+                arguments: self.arguments.clone(),
+            },
+        })
     }
 }
