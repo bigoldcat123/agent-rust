@@ -6,7 +6,9 @@ use async_openai::types::chat::{
     ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage,
     ChatCompletionRequestUserMessageContent, FunctionCall,
 };
+use serde_json::json;
 
+#[derive(Clone,Debug)]
 pub enum UserMessageContent {
     Text { content: String },
 }
@@ -18,12 +20,14 @@ impl UserMessageContent {
     }
 }
 
+#[derive(Clone,Debug)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub arguments: String,
 }
 
+#[derive(Clone,Debug)]
 pub enum Message {
     User {
         content: UserMessageContent,
@@ -34,7 +38,7 @@ pub enum Message {
     Assistant {
         content: Option<String>,
         reasoning: Option<String>,
-        tool_calls: Vec<ToolCall>,
+        tool_calls: Option<Vec<ToolCall>>,
     },
     Tool {
         tool_call_id: String,
@@ -60,14 +64,14 @@ impl Message {
         Self::Assistant {
             content: Some(content.into()),
             reasoning: None,
-            tool_calls: vec![],
+            tool_calls: None,
         }
     }
 
     pub fn assistant_with_details(
         content: Option<String>,
         reasoning: Option<String>,
-        tool_calls: Vec<ToolCall>,
+        tool_calls: Option<Vec<ToolCall>>,
     ) -> Self {
         Self::Assistant {
             content,
@@ -99,18 +103,21 @@ impl Message {
             }
             Self::Assistant {
                 content,
-                reasoning: _,
+                reasoning: r,
                 tool_calls,
             } => ChatCompletionRequestMessage::Assistant(ChatCompletionRequestAssistantMessage {
                 content: content
                     .clone()
                     .map(ChatCompletionRequestAssistantMessageContent::Text),
-                tool_calls: (!tool_calls.is_empty()).then(|| {
-                    tool_calls
+                tool_calls: (!tool_calls.is_none()).then(|| {
+                    tool_calls.as_ref().unwrap()
                         .iter()
                         .map(ToolCall::to_chat_completion_message_tool_call)
                         .collect()
                 }),
+                extra:r.clone().map(|x| json!({
+                    "reasoning_content":x
+                })),
                 ..Default::default()
             }),
             Self::Tool {
