@@ -2,6 +2,7 @@ pub mod error;
 mod message;
 pub mod provider;
 pub mod tool;
+use async_openai::config::OpenAIConfig;
 use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
 pub use provider::Provider as ModelClient;
@@ -64,6 +65,12 @@ pub struct AngentOutput {
 pub struct Client<T> {
     inner: T,
 }
+impl Client<OpenAI<async_openai::Client<OpenAIConfig>>> {
+    pub fn new(req:Request) -> Self {
+        Client { inner: OpenAI::new(req) }
+    }
+}
+
 
 impl<T: Provider> Provider for Client<T> {
     fn run_for_result<'a>(&'a mut self) -> provider::ProviderFuture<'a> {

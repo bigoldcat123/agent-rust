@@ -6,7 +6,7 @@ use async_openai::{
 use futures::StreamExt;
 
 use crate::{
-    AgentOutputPart, AngentOutput, Client, Message, Request, ToolCall,
+    AgentOutputPart, AngentOutput, Message, Request, ToolCall,
     error::{Error, Result},
     tool::{NoopToolExecutor, ToolExecutor},
 };

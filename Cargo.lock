@@ -10,6 +10,7 @@ dependencies = [
  "derive_builder",
  "futures",
  "pin-project-lite",
+ "serde",
  "serde_json",
  "thiserror",
  "tokio",
