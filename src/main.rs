@@ -3,7 +3,7 @@ use agent::{
     ToolFn, ToolOutput, ToolRegistry, error::Error,
 };
 use serde_json::{Value, json};
-use tokio::io::{AsyncWriteExt, stdout};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, stdin, stdout};
 use tokio::process::Command;
 
 fn weather_tool() -> (Tool, impl ToolExecutor) {
@@ -86,6 +86,116 @@ fn shell_tool() -> (Tool, impl ToolExecutor) {
     )
 }
 
+fn ask_user_tool() -> (Tool, impl ToolExecutor) {
+    (
+        Tool::new(
+            "ask_user",
+            Some(
+                "Ask the user a question in the terminal and wait for their answer. Optional preset answers can be provided."
+                    .to_string(),
+            ),
+            Some(json!({
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "The question to ask the user."
+                    },
+                    "options": {
+                        "type": "array",
+                        "description": "Optional preset answers. The user can type a number or enter a custom answer.",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": ["question"]
+            })),
+            None,
+        ),
+        ToolFn::new(|toolcall: ToolCall| async move {
+            let args: Value = serde_json::from_str(&toolcall.arguments).map_err(|source| {
+                Error::InvalidToolArguments {
+                    name: toolcall.name.clone(),
+                    source,
+                }
+            })?;
+            let question = args
+                .get("question")
+                .and_then(Value::as_str)
+                .ok_or_else(|| Error::ToolFailed {
+                    name: toolcall.name.clone(),
+                    message: "missing string argument `question`".to_string(),
+                })?
+                .to_string();
+            let options = args
+                .get("options")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_string)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+
+            let mut out = stdout();
+            out.write_all(format!("\n{}\n", question).as_bytes())
+                .await
+                .map_err(|e| Error::ToolFailed {
+                    name: toolcall.name.clone(),
+                    message: e.to_string(),
+                })?;
+            for (index, option) in options.iter().enumerate() {
+                out.write_all(format!("  {}. {}\n", index + 1, option).as_bytes())
+                    .await
+                    .map_err(|e| Error::ToolFailed {
+                        name: toolcall.name.clone(),
+                        message: e.to_string(),
+                    })?;
+            }
+            out.write_all(b"> ").await.map_err(|e| Error::ToolFailed {
+                name: toolcall.name.clone(),
+                message: e.to_string(),
+            })?;
+            out.flush().await.map_err(|e| Error::ToolFailed {
+                name: toolcall.name.clone(),
+                message: e.to_string(),
+            })?;
+
+            let mut input = String::new();
+            BufReader::new(stdin())
+                .read_line(&mut input)
+                .await
+                .map_err(|e| Error::ToolFailed {
+                    name: toolcall.name.clone(),
+                    message: e.to_string(),
+                })?;
+            let raw_answer = input.trim().to_string();
+            let selected_index = raw_answer
+                .parse::<usize>()
+                .ok()
+                .and_then(|index| index.checked_sub(1))
+                .filter(|index| *index < options.len());
+            let answer = selected_index
+                .and_then(|index| options.get(index).cloned())
+                .unwrap_or_else(|| raw_answer.clone());
+
+            Ok(ToolOutput::new(
+                toolcall.id,
+                json!({
+                    "question": question,
+                    "answer": answer,
+                    "raw_answer": raw_answer,
+                    "selected_index": selected_index,
+                })
+                .to_string(),
+            ))
+        }),
+    )
+}
+
 #[tokio::main]
 async fn main() {
     let mut tool_registry = ToolRegistry::new();
@@ -93,9 +203,11 @@ async fn main() {
     tool_registry.insert_executor(tool, tool_executor);
     let (tool, tool_executor) = shell_tool();
     tool_registry.insert_executor(tool, tool_executor);
+    let (tool, tool_executor) = ask_user_tool();
+    tool_registry.insert_executor(tool, tool_executor);
     let messages = vec![
-        Message::system(r#"you are a helpful agent"#),
-        Message::user_text("在 /Users/dadigua/Desktop 创建一个html，介绍你自己。"),
+        Message::system(r#"you are a helpful agent，每当你有不明白的地方，你总是会调用ask_user 去询问。"#),
+        Message::user_text("请你问我几个问题，然后总结出我是一个什么人。"),
     ];
     let req = RequestBuilder::default()
         .modle("deepseek-v4-flash")
@@ -131,7 +243,7 @@ async fn main() {
             }
             AgentOutputPart::Tool(tools) => {
                 for t in tools {
-                    println!("\n{}", t.name);
+                    println!("\ntool call -> {}", t.name);
                 }
             }
         }

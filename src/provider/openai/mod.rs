@@ -22,9 +22,9 @@ pub struct OpenAI<C> {
 }
 
 impl OpenAI<async_openai::Client<OpenAIConfig>> {
-    pub fn new(req: Request) -> Self{
-        Self{
-            output_part_tx:None,
+    pub fn new(req: Request) -> Self {
+        Self {
+            output_part_tx: None,
             req,
             out_messages: vec![],
             client: async_openai::Client::new(),
