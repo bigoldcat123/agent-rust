@@ -16,7 +16,6 @@ async fn main() -> agent::error::Result<()> {
     tool_registory.insert_executor(shell_tool.0, shell_tool.1);
     let req = RequestBuilder::default()
         .messages(messages)
-        .tools(tool_registory.tools())
         .build()
         .map_err(|e| agent::error::Error::RequestBuild {
             message: e.to_string(),

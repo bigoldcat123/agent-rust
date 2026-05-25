@@ -11,9 +11,11 @@ pub use provider::Provider as ModelClient;
 pub use provider::{OpenAI, Provider};
 use serde_json::Value;
 pub use tool::{NoopToolExecutor, ToolExecutor, ToolFn, ToolFuture, ToolOutput, ToolRegistry};
+
+use crate::tool::ToolProviderAndExecutor;
 #[derive(Builder)]
 pub struct Request {
-    #[builder(default)]
+    #[builder(setter(skip), default)]
     tools: Vec<Tool>,
     #[builder(default)]
     messages: Vec<Message>,
@@ -105,7 +107,7 @@ impl Client<OpenAI<async_openai::Client<OpenAIConfig>>> {
 
     pub fn with_tool_executor<T>(mut self, tool_executor: T) -> Self
     where
-        T: ToolExecutor + 'static,
+        T: ToolProviderAndExecutor + 'static,
     {
         self.inner.tool_executor = Box::new(tool_executor);
         self

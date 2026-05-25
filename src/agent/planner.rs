@@ -26,7 +26,6 @@ impl<C: Provider + Send> Provider for PlanAgent<C> {
                 },
             ];
             let plan_req = RequestBuilder::default()
-                .tools(tool_registory.tools())
                 .messages(messages)
                 .build()
                 .map_err(|e| crate::error::Error::RequestBuild {

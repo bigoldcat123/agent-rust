@@ -33,6 +33,11 @@ pub type ToolFuture<'a> = Pin<Box<dyn Future<Output = Result<ToolOutput>> + Send
 pub trait ToolExecutor: Send {
     fn call<'a>(&'a mut self, call: ToolCall) -> ToolFuture<'a>;
 }
+pub trait ToolProvider: Send {
+    fn tools(&self) -> Vec<Tool>;
+}
+pub trait ToolProviderAndExecutor:ToolExecutor + ToolProvider {}
+impl <T: ToolExecutor + ToolProvider> ToolProviderAndExecutor for T {}
 
 impl<T> ToolExecutor for Box<T>
 where
@@ -48,6 +53,11 @@ pub struct NoopToolExecutor;
 impl ToolExecutor for NoopToolExecutor {
     fn call<'a>(&'a mut self, call: ToolCall) -> ToolFuture<'a> {
         Box::pin(async move { Ok(ToolOutput::new(call.id, "")) })
+    }
+}
+impl ToolProvider for NoopToolExecutor {
+    fn tools(&self) -> Vec<Tool> {
+        vec![]
     }
 }
 
@@ -123,6 +133,12 @@ impl ToolRegistry {
             .values()
             .map(|entry| entry.tool.clone())
             .collect()
+    }
+}
+
+impl ToolProvider for ToolRegistry {
+    fn tools(&self) -> Vec<Tool> {
+        self.tools()
     }
 }
 

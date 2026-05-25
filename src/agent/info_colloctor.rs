@@ -39,7 +39,6 @@ impl<C: Provider + Send> Provider for InfoCollectAgent<C> {
             tool_registry.insert(ask_user_tool());
             let c_req = RequestBuilder::default()
                 .messages(messages)
-                .tools(tool_registry.tools())
                 .build()
                 .map_err(|e| crate::error::Error::RequestBuild {
                     message: e.to_string(),

@@ -1,16 +1,10 @@
 use agent::{
-    Message, OpenAI, Provider, RequestBuilder, ToolRegistry,
-    tool::{ask_user_tool, shell_tool, weather_tool},
-    util::tui,
+    Message, OpenAI, Provider, RequestBuilder, agent::info_colloctor::WithInfoCollectAgent, util::tui
 };
 use serde_json::json;
 
 #[tokio::main]
 async fn main() -> agent::error::Result<()> {
-    let mut tool_registry = ToolRegistry::new();
-    tool_registry.insert(weather_tool());
-    tool_registry.insert(shell_tool());
-    tool_registry.insert(ask_user_tool());
     let messages = vec![
         Message::system(
             r#"每次都返回以josn的形式返回， {
@@ -23,9 +17,8 @@ async fn main() -> agent::error::Result<()> {
         ),
     ];
     let req = RequestBuilder::default()
-        .modle("deepseek-v4-pro")
+        .modle("deepseek-v4-flash")
         .messages(messages)
-        .tools(tool_registry.tools())
         .extra(json!({
             "response_format":{
                 "type":"json_object"
@@ -35,7 +28,8 @@ async fn main() -> agent::error::Result<()> {
         .map_err(|e| agent::error::Error::RequestBuild {
             message: e.to_string(),
         })?;
-    let (mut client, rx) = OpenAI::new().with_tool_executor(tool_registry).with_tx();
+    let (client, rx) = OpenAI::new().with_tx();
+    let mut client = client.with_info_collect_agent();
     tokio::spawn(async move {
         let _res = client.run_for_result(req).await;
         println!("\n{:?}", _res);

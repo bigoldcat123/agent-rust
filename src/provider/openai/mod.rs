@@ -8,7 +8,7 @@ use futures::StreamExt;
 use crate::{
     AgentOutputPart, AngentOutput, Message, Request, ToolCall,
     error::{Error, Result},
-    tool::{NoopToolExecutor, ToolExecutor},
+    tool::{NoopToolExecutor, ToolExecutor, ToolProviderAndExecutor},
 };
 
 use super::{Provider, ProviderFuture};
@@ -17,7 +17,7 @@ pub struct OpenAI<C> {
     pub(crate) client: C,
     pub(crate) output_part_tx: Option<tokio::sync::mpsc::Sender<AgentOutputPart>>,
     pub(crate) out_messages: Vec<Message>,
-    pub(crate) tool_executor: Box<dyn ToolExecutor>,
+    pub(crate) tool_executor: Box<dyn ToolProviderAndExecutor>,
 }
 
 impl OpenAI<async_openai::Client<OpenAIConfig>> {
@@ -32,7 +32,7 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
 
     pub fn with_tool_executor<T>(mut self, tool_executor: T) -> Self
     where
-        T: ToolExecutor + 'static,
+        T: ToolProviderAndExecutor + 'static,
     {
         self.tool_executor = Box::new(tool_executor);
         self
@@ -71,7 +71,8 @@ impl Default for OpenAI<async_openai::Client<OpenAIConfig>> {
 }
 
 impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
-    fn run_for_result<'a>(&'a mut self, req: Request) -> ProviderFuture<'a> {
+    fn run_for_result<'a>(&'a mut self, mut req: Request) -> ProviderFuture<'a> {
+        req.tools = self.tool_executor.tools();
         Box::pin(async move {
             let chat = self.client.chat();
             let openai_req = self.create_chat_completion_request(&req)?;
