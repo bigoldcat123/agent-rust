@@ -5,7 +5,7 @@ use tokio::{
 
 use crate::AgentOutputPart;
 
-pub async fn tui(mut rx: Receiver<AgentOutputPart>) {
+pub async fn tui(mut rx: Receiver<AgentOutputPart>) -> crate::error::Result<()> {
     let mut is_reasoning = false;
     let mut stdout = stdout();
     while let Some(msg) = rx.recv().await {
@@ -15,8 +15,14 @@ pub async fn tui(mut rx: Receiver<AgentOutputPart>) {
                     is_reasoning = false;
                     println!("\n -> answer 🤓")
                 }
-                stdout.write_all(text.as_bytes()).await.unwrap();
-                stdout.flush().await.unwrap();
+                stdout
+                    .write_all(text.as_bytes())
+                    .await
+                    .map_err(|source| crate::error::Error::OutputWrite { source })?;
+                stdout
+                    .flush()
+                    .await
+                    .map_err(|source| crate::error::Error::OutputWrite { source })?;
                 // print!("{}", text)
             }
             AgentOutputPart::Reasoning(r) => {
@@ -24,8 +30,14 @@ pub async fn tui(mut rx: Receiver<AgentOutputPart>) {
                     println!("\n -> reasoning 🤔");
                     is_reasoning = true
                 }
-                stdout.write_all(r.as_bytes()).await.unwrap();
-                stdout.flush().await.unwrap();
+                stdout
+                    .write_all(r.as_bytes())
+                    .await
+                    .map_err(|source| crate::error::Error::OutputWrite { source })?;
+                stdout
+                    .flush()
+                    .await
+                    .map_err(|source| crate::error::Error::OutputWrite { source })?;
             }
             AgentOutputPart::Tool(tools) => {
                 for t in tools {
@@ -34,4 +46,5 @@ pub async fn tui(mut rx: Receiver<AgentOutputPart>) {
             }
         }
     }
+    Ok(())
 }

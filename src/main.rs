@@ -6,7 +6,7 @@ use agent::{
 use serde_json::json;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> agent::error::Result<()> {
     let mut tool_registry = ToolRegistry::new();
     tool_registry.insert(weather_tool());
     tool_registry.insert(shell_tool());
@@ -32,11 +32,13 @@ async fn main() {
             }
         }))
         .build()
-        .unwrap();
+        .map_err(|e| agent::error::Error::RequestBuild {
+            message: e.to_string(),
+        })?;
     let (mut client, rx) = OpenAI::new().with_tool_executor(tool_registry).with_tx();
     tokio::spawn(async move {
         let _res = client.run_for_result(req).await;
         println!("\n{:?}", _res);
     });
-    tui(rx).await;
+    tui(rx).await
 }

@@ -4,7 +4,7 @@ use agent::{
 };
 
 #[tokio::main]
-async fn main() {
+async fn main() -> agent::error::Result<()> {
     let messages = vec![
         Message::system(
             "you are a helpful agent, you will finish the task by leveaging the power of all tools that you can access",
@@ -18,12 +18,14 @@ async fn main() {
         .messages(messages)
         .tools(tool_registory.tools())
         .build()
-        .unwrap();
+        .map_err(|e| agent::error::Error::RequestBuild {
+            message: e.to_string(),
+        })?;
     let (agent, rx) = Client::new().with_tool_executor(tool_registory).with_tx();
     let mut agent = agent.with_planner();
     tokio::spawn(async move {
-        let res = agent.run_for_result(req).await.unwrap();
+        let res = agent.run_for_result(req).await;
         println!("{:?}", res);
     });
-    tui(rx).await;
+    tui(rx).await
 }

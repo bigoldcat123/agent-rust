@@ -29,7 +29,9 @@ impl<C: Provider + Send> Provider for PlanAgent<C> {
                 .tools(tool_registory.tools())
                 .messages(messages)
                 .build()
-                .unwrap();
+                .map_err(|e| crate::error::Error::RequestBuild {
+                    message: e.to_string(),
+                })?;
             let mut agent = OpenAI::new().with_tool_executor(tool_registory);
             let (content, _) = agent
                 .run_for_result(plan_req)

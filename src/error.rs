@@ -10,6 +10,12 @@ pub enum Error {
     #[error("provider output receiver has been dropped")]
     OutputClosed,
 
+    #[error("failed to write agent output: {source}")]
+    OutputWrite {
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("provider response did not include any choices")]
     EmptyChoices,
 
@@ -37,9 +43,15 @@ pub enum Error {
     #[error("user response did not include content")]
     MissingUserContent,
 
+    #[error("request did not include any messages")]
+    MissingMessage,
+
     #[error("invalid assistant response: {source}")]
     InvalidAssistantResponse {
         #[source]
         source: serde_json::Error,
     },
+
+    #[error("failed to build request: {message}")]
+    RequestBuild { message: String },
 }

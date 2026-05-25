@@ -101,7 +101,8 @@ impl<C: Provider + Send> Provider for InfoCollectAgent<C> {
         Box::pin(async move {
             let messages = vec![
                 Message::system(&self.prompt),
-                req.get_last_message().unwrap(),
+                req.get_last_message()
+                    .ok_or(agent::error::Error::MissingMessage)?,
             ];
             let mut tool_registry = ToolRegistry::new();
             let (tool, tool_executor) = ask_user_tool();
@@ -110,7 +111,9 @@ impl<C: Provider + Send> Provider for InfoCollectAgent<C> {
                 .messages(messages)
                 .tools(tool_registry.tools())
                 .build()
-                .unwrap();
+                .map_err(|e| agent::error::Error::RequestBuild {
+                    message: e.to_string(),
+                })?;
             let mut c = OpenAI::new().with_tool_executor(tool_registry);
             let res = c.run_for_result(c_req).await?;
             let res = if let Some(Message::Assistant {
@@ -143,7 +146,7 @@ pub enum Intent {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> agent::error::Result<()> {
     match_agent!(Intent,user_input,
         Ticket => {
             println!("matched ticket {user_input:?}");
@@ -174,10 +177,13 @@ async fn main() {
             }
         }))
         .build()
-        .unwrap();
+        .map_err(|e| agent::error::Error::RequestBuild {
+            message: e.to_string(),
+        })?;
 
     let agent = IntentAgent::new(Client::new());
     let mut agent = InfoCollectAgent::new(agent);
-    let res = agent.run_for_result(req).await.unwrap();
-    println!("{:?}", res.contents.last().cloned().unwrap())
+    let res = agent.run_for_result(req).await?;
+    println!("{:?}", res.contents.last().cloned());
+    Ok(())
 }
