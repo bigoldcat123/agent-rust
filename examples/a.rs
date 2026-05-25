@@ -63,3 +63,37 @@ async fn main() {
         _ => (),
     }
 }
+
+#[derive(Deserialize)]
+enum X {
+    Yes,
+    No
+}
+#[derive(Deserialize)]
+struct R {
+    answer:X
+}
+
+struct MatchAgent<T,E> {
+    inner: Client<T>,
+    e:E
+}
+impl <T:Provider + Send> Provider for MatchAgent<T,R> {
+    fn run_for_result<'a>(&'a mut self, req: agent::Request) -> agent::provider::ProviderFuture<'a> {
+        Box::pin(async move {
+            let res = self.inner.run_for_result(req).await?;
+            if let Some(Message::Assistant { content:Some(content), reasoning:_, tool_calls :_}) = res.contents.last() {
+                let r = serde_json::from_str::<R>(content).expect("msg");
+                match r.answer {
+                    X::Yes => {
+                        unimplemented!()
+                    }
+                    X::No => {
+                        unimplemented!()
+                    }
+                }
+            }
+            Err(agent::error::Error::OutputClosed)
+        })
+    }
+}
