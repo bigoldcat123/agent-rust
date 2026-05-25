@@ -54,4 +54,6 @@ pub enum Error {
 
     #[error("failed to build request: {message}")]
     RequestBuild { message: String },
+    #[error("InvalidRequest")]
+    InvalidRequest,
 }

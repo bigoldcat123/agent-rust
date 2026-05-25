@@ -7,7 +7,6 @@ pub mod util;
 use async_openai::config::OpenAIConfig;
 use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
-pub use provider::Provider as ModelClient;
 pub use provider::{OpenAI, Provider};
 use serde_json::Value;
 pub use tool::{NoopToolExecutor, ToolExecutor, ToolFn, ToolFuture, ToolOutput, ToolRegistry};
