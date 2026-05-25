@@ -1,8 +1,8 @@
 use agent::{
     AgentOutputPart, Message, OpenAI, Provider, RequestBuilder, ToolRegistry,
-    tool::{ask_user_tool, shell_tool, weather_tool},
+    tool::{ask_user_tool, shell_tool, weather_tool}, util::tui,
 };
-use tokio::io::{AsyncWriteExt, stdout};
+use serde_json::json;
 
 #[tokio::main]
 async fn main() {
@@ -15,47 +15,28 @@ async fn main() {
     tool_registry.insert_executor(tool, tool_executor);
     let messages = vec![
         Message::system(
-            r#"you are a helpful agent，每当你有不明白的地方，你总是会调用ask_user 去询问。"#,
+            r#"每次都返回以josn的形式返回， {
+                "mood":"your current mood",
+                "answer":"your answer"
+            }"#,
         ),
-        Message::user_text("请你问我几个问题，然后总结出我是一个什么人。"),
+        Message::user_text("请你使用 ask_user tool问我几个问题，然后总结出我是一个什么人。最后以json的形式回答。"),
     ];
     let req = RequestBuilder::default()
-        .modle("deepseek-v4-flash")
+        .modle("deepseek-v4-pro")
         .messages(messages)
         .tools(tool_registry.tools())
+        .extra(json!({
+            "response_format":{
+                "type":"json_object"
+            }
+        }))
         .build()
         .unwrap();
-    let (mut client, mut rx) = OpenAI::new().with_tool_executor(tool_registry).with_tx();
+    let (mut client,  rx) = OpenAI::new().with_tool_executor(tool_registry).with_tx();
     tokio::spawn(async move {
         let _res = client.run_for_result(req).await;
         println!("\n{:?}", _res);
     });
-    let mut is_reasoning = false;
-    let mut stdout = stdout();
-    while let Some(msg) = rx.recv().await {
-        match msg {
-            AgentOutputPart::Content(text) => {
-                if is_reasoning {
-                    is_reasoning = false;
-                    println!("\n -> answer 🤓")
-                }
-                stdout.write_all(text.as_bytes()).await.unwrap();
-                stdout.flush().await.unwrap();
-                // print!("{}", text)
-            }
-            AgentOutputPart::Reasoning(r) => {
-                if !is_reasoning {
-                    println!("\n -> reasoning 🤔");
-                    is_reasoning = true
-                }
-                stdout.write_all(r.as_bytes()).await.unwrap();
-                stdout.flush().await.unwrap();
-            }
-            AgentOutputPart::Tool(tools) => {
-                for t in tools {
-                    println!("\ntool call -> {}", t.name);
-                }
-            }
-        }
-    }
+    tui(rx).await;
 }

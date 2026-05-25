@@ -13,3 +13,6 @@ tower = "0.5.3"
 derive_builder = "0.20.2"
 thiserror = "2"
 serde = { version = "1.0.228", features = ["derive"] }
+
+[dev-dependencies]
+paste = "1"

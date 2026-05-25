@@ -1,4 +1,6 @@
 pub mod error;
+pub mod util;
+pub mod agent;
 mod message;
 pub mod provider;
 pub mod tool;
@@ -19,6 +21,21 @@ pub struct Request {
     extra: Option<Value>,
     #[builder(setter(into),default=format!("deepseek-v4-flash"))]
     modle: String,
+}
+impl Request {
+    pub fn get_last_message(&self) -> Option<Message> {
+        self.messages.last().cloned()
+    }
+    pub fn get_last_user_message(&self) -> Result<UserMessageContent,crate::error::Error> {
+        if let Some(Message::User { content }) = self.get_last_message() {
+            Ok(content)
+        }else {
+            Err(crate::error::Error::MissingUserContent)
+        }
+    }
+    pub fn messages_mut(&mut self) -> &mut Vec<Message> {
+        &mut self.messages
+    }
 }
 
 #[derive(Clone)]
@@ -61,7 +78,17 @@ pub enum AgentOutputPart {
 pub struct AngentOutput {
     pub contents: Vec<Message>,
 }
+impl AngentOutput {
 
+    /// (content,reasoning)
+    pub fn get_last_assistant_message(&self) -> Option<(String,String)> {
+        if let Some(Message::Assistant { content:Some(c), reasoning:Some(r), tool_calls:_ }) = self.contents.last() {
+            Some((c.clone(), r.clone()))
+        }else {
+            None
+        }
+    }
+}
 pub struct Client<T> {
     inner: T,
 }
@@ -71,6 +98,20 @@ impl Client<OpenAI<async_openai::Client<OpenAIConfig>>> {
             inner: OpenAI::new(),
         }
     }
+
+    pub fn with_tool_executor<T>(mut self, tool_executor: T) -> Self
+    where
+        T: ToolExecutor + 'static,
+    {
+        self.inner.tool_executor = Box::new(tool_executor);
+        self
+    }
+    pub fn with_tx(mut self) -> (Self, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
+        let (tx, rx) = tokio::sync::mpsc::channel(1024);
+        self.inner.output_part_tx = Some(tx);
+        (self, rx)
+    }
+
 }
 
 impl<T: Provider> Provider for Client<T> {

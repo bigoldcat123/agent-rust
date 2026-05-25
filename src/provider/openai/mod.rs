@@ -14,10 +14,10 @@ use crate::{
 use super::{Provider, ProviderFuture};
 
 pub struct OpenAI<C> {
-    output_part_tx: Option<tokio::sync::mpsc::Sender<AgentOutputPart>>,
-    out_messages: Vec<Message>,
-    client: C,
-    tool_executor: Box<dyn ToolExecutor>,
+    pub(crate) output_part_tx: Option<tokio::sync::mpsc::Sender<AgentOutputPart>>,
+    pub(crate) out_messages: Vec<Message>,
+    pub(crate) client: C,
+    pub(crate) tool_executor: Box<dyn ToolExecutor>,
 }
 
 impl OpenAI<async_openai::Client<OpenAIConfig>> {
