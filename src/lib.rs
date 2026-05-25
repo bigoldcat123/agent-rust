@@ -1,9 +1,9 @@
-pub mod error;
-pub mod util;
 pub mod agent;
+pub mod error;
 mod message;
 pub mod provider;
 pub mod tool;
+pub mod util;
 use async_openai::config::OpenAIConfig;
 use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
@@ -26,10 +26,10 @@ impl Request {
     pub fn get_last_message(&self) -> Option<Message> {
         self.messages.last().cloned()
     }
-    pub fn get_last_user_message(&self) -> Result<UserMessageContent,crate::error::Error> {
+    pub fn get_last_user_message(&self) -> Result<UserMessageContent, crate::error::Error> {
         if let Some(Message::User { content }) = self.get_last_message() {
             Ok(content)
-        }else {
+        } else {
             Err(crate::error::Error::MissingUserContent)
         }
     }
@@ -79,12 +79,16 @@ pub struct AngentOutput {
     pub contents: Vec<Message>,
 }
 impl AngentOutput {
-
     /// (content,reasoning)
-    pub fn get_last_assistant_message(&self) -> Option<(String,String)> {
-        if let Some(Message::Assistant { content:Some(c), reasoning:Some(r), tool_calls:_ }) = self.contents.last() {
+    pub fn get_last_assistant_message(&self) -> Option<(String, String)> {
+        if let Some(Message::Assistant {
+            content: Some(c),
+            reasoning: Some(r),
+            tool_calls: _,
+        }) = self.contents.last()
+        {
             Some((c.clone(), r.clone()))
-        }else {
+        } else {
             None
         }
     }
@@ -111,7 +115,12 @@ impl Client<OpenAI<async_openai::Client<OpenAIConfig>>> {
         self.inner.output_part_tx = Some(tx);
         (self, rx)
     }
+}
 
+impl Default for Client<OpenAI<async_openai::Client<OpenAIConfig>>> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T: Provider> Provider for Client<T> {

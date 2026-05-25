@@ -1,8 +1,11 @@
-use tokio::{io::{AsyncWriteExt, stdout}, sync::mpsc::Receiver};
+use tokio::{
+    io::{AsyncWriteExt, stdout},
+    sync::mpsc::Receiver,
+};
 
 use crate::AgentOutputPart;
 
-pub async fn tui(mut rx:Receiver<AgentOutputPart>) {
+pub async fn tui(mut rx: Receiver<AgentOutputPart>) {
     let mut is_reasoning = false;
     let mut stdout = stdout();
     while let Some(msg) = rx.recv().await {

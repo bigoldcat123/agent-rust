@@ -1,4 +1,7 @@
-use agent::{Client, Message, OpenAI, Provider, Request, RequestBuilder, ToolRegistry, UserMessageContent, tool::{ask_user_tool, shell_tool, weather_tool}};
+use agent::{
+    Client, Message, OpenAI, Provider, RequestBuilder, ToolRegistry, UserMessageContent,
+    tool::ask_user_tool,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -69,43 +72,61 @@ macro_rules! match_agent {
     };
 }
 struct InfoCollectAgent<C> {
-    next:C,
-    prompt:String
+    next: C,
+    prompt: String,
 }
-impl <C> InfoCollectAgent<C> {
-    pub fn new(agent:C) -> Self {
+impl<C> InfoCollectAgent<C> {
+    pub fn new(agent: C) -> Self {
         let mut prompt = String::new();
         prompt.push_str("你是一个信息收集者，你只管收集信息，最后的回答必须要包括用户的原始问题， 以及你收集到的所有信息，尽量多的使用ask_user 去获取不确定的信息。
             最后输出格式：
             用户原始问题：...
             已知的信息:...");
-        InfoCollectAgent { next: agent, prompt}
+        InfoCollectAgent {
+            next: agent,
+            prompt,
+        }
     }
-    pub fn with_prompt(mut self,prompt:String) -> Self{
+    #[allow(dead_code)]
+    pub fn with_prompt(mut self, prompt: String) -> Self {
         self.prompt = prompt;
         self
     }
 }
-impl <C:Provider + Send> Provider for InfoCollectAgent<C> {
-    fn run_for_result<'a>(&'a mut self, mut req: agent::Request) -> agent::provider::ProviderFuture<'a> {
-
+impl<C: Provider + Send> Provider for InfoCollectAgent<C> {
+    fn run_for_result<'a>(
+        &'a mut self,
+        mut req: agent::Request,
+    ) -> agent::provider::ProviderFuture<'a> {
         Box::pin(async move {
             let messages = vec![
                 Message::system(&self.prompt),
-                req.get_last_message().unwrap()
+                req.get_last_message().unwrap(),
             ];
             let mut tool_registry = ToolRegistry::new();
             let (tool, tool_executor) = ask_user_tool();
             tool_registry.insert_executor(tool, tool_executor);
-            let c_req = RequestBuilder::default().messages(messages).tools(tool_registry.tools()).build().unwrap();
+            let c_req = RequestBuilder::default()
+                .messages(messages)
+                .tools(tool_registry.tools())
+                .build()
+                .unwrap();
             let mut c = OpenAI::new().with_tool_executor(tool_registry);
             let res = c.run_for_result(c_req).await?;
-            let res = if let Some(Message::Assistant { content:Some(content), reasoning:_, tool_calls:_ }) = res.contents.last() {
+            let res = if let Some(Message::Assistant {
+                content: Some(content),
+                reasoning: _,
+                tool_calls: _,
+            }) = res.contents.last()
+            {
                 content.clone()
-            }else {
+            } else {
                 return Err(agent::error::Error::MissingAssistantContent);
             };
-            if let Some(Message::User { content:UserMessageContent::Text { content} }) = req.messages_mut().last_mut() {
+            if let Some(Message::User {
+                content: UserMessageContent::Text { content },
+            }) = req.messages_mut().last_mut()
+            {
                 *content = res;
             }
 
@@ -113,7 +134,6 @@ impl <C:Provider + Send> Provider for InfoCollectAgent<C> {
         })
     }
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Intent {
@@ -159,6 +179,5 @@ async fn main() {
     let agent = IntentAgent::new(Client::new());
     let mut agent = InfoCollectAgent::new(agent);
     let res = agent.run_for_result(req).await.unwrap();
-    println!("{:?}",res.contents.last().cloned().unwrap())
-
+    println!("{:?}", res.contents.last().cloned().unwrap())
 }

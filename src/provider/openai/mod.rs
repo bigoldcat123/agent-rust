@@ -64,6 +64,12 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
     }
 }
 
+impl Default for OpenAI<async_openai::Client<OpenAIConfig>> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
     fn run_for_result<'a>(&'a mut self, req: Request) -> ProviderFuture<'a> {
         Box::pin(async move {

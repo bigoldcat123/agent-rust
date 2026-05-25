@@ -86,6 +86,16 @@ impl ToolRegistry {
         Self::default()
     }
 
+    pub fn insert(&mut self, tool: (Tool, impl ToolExecutor + 'static)) {
+        self.tools.insert(
+            tool.0.name().to_string(),
+            RegisteredTool {
+                tool: tool.0,
+                executor: Box::new(tool.1),
+            },
+        );
+    }
+
     pub fn insert_executor(&mut self, tool: Tool, executor: impl ToolExecutor + 'static) {
         self.tools.insert(
             tool.name().to_string(),

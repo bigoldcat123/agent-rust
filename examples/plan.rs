@@ -1,10 +1,7 @@
 use agent::{
-    AgentOutputPart, Client, Message, OpenAI, Provider, Request, RequestBuilder, ToolRegistry,
-    agent::planner::WithPlanner,
-    tool::{ask_user_tool, shell_tool},
-    util::tui,
+    Client, Message, Provider, RequestBuilder, ToolRegistry, agent::planner::WithPlanner,
+    tool::shell_tool, util::tui,
 };
-use tokio::io::{AsyncWriteExt, stdout};
 
 #[tokio::main]
 async fn main() {
