@@ -66,15 +66,15 @@ pub struct Client<T> {
     inner: T,
 }
 impl Client<OpenAI<async_openai::Client<OpenAIConfig>>> {
-    pub fn new(req: Request) -> Self {
+    pub fn new() -> Self {
         Client {
-            inner: OpenAI::new(req),
+            inner: OpenAI::new(),
         }
     }
 }
 
 impl<T: Provider> Provider for Client<T> {
-    fn run_for_result<'a>(&'a mut self) -> provider::ProviderFuture<'a> {
-        self.inner.run_for_result()
+    fn run_for_result<'a>(&'a mut self,req:Request) -> provider::ProviderFuture<'a> {
+        self.inner.run_for_result(req)
     }
 }

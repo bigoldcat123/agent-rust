@@ -31,8 +31,8 @@ async fn main() {
         }))
         .build()
         .unwrap();
-    let mut client = Client::new(req);
-    let res = client.run_for_result().await.unwrap();
+    let mut client = Client::new();
+    let res = client.run_for_result(req).await.unwrap();
     match res.contents.last() {
         Some(Message::Assistant {
             content,

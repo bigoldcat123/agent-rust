@@ -15,17 +15,15 @@ use super::{Provider, ProviderFuture};
 
 pub struct OpenAI<C> {
     output_part_tx: Option<tokio::sync::mpsc::Sender<AgentOutputPart>>,
-    req: Request,
     out_messages: Vec<Message>,
     client: C,
     tool_executor: Box<dyn ToolExecutor>,
 }
 
 impl OpenAI<async_openai::Client<OpenAIConfig>> {
-    pub fn new(req: Request) -> Self {
+    pub fn new() -> Self {
         Self {
             output_part_tx: None,
-            req,
             out_messages: vec![],
             client: async_openai::Client::new(),
             tool_executor: Box::new(NoopToolExecutor),
@@ -45,8 +43,8 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
         (self, rx)
     }
 
-    pub(crate) fn create_chat_completion_request(&self) -> Result<CreateChatCompletionRequest> {
-        let mut r: CreateChatCompletionRequest = (&self.req).try_into()?;
+    pub(crate) fn create_chat_completion_request(&self, req: &Request) -> Result<CreateChatCompletionRequest> {
+        let mut r: CreateChatCompletionRequest = req.try_into()?;
         let pre_messages = self.out_messages.iter().map(Into::into).collect::<Vec<_>>();
         r.messages.extend(pre_messages);
         Ok(r)
@@ -64,11 +62,11 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
 }
 
 impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
-    fn run_for_result<'a>(&'a mut self) -> ProviderFuture<'a> {
+    fn run_for_result<'a>(&'a mut self,req:Request) -> ProviderFuture<'a> {
         Box::pin(async move {
             let chat = self.client.chat();
-            let req = self.create_chat_completion_request()?;
-            let mut stream = chat.create_stream(&req).await?;
+            let openai_req = self.create_chat_completion_request(&req)?;
+            let mut stream = chat.create_stream(&openai_req).await?;
             let mut reasonging = String::new();
             let mut content = String::new();
             let mut tools = vec![];
@@ -168,7 +166,7 @@ impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
                                         tool_calls: Some(tools),
                                     });
                                     self.out_messages.extend(tool_res);
-                                    return self.run_for_result().await;
+                                    return self.run_for_result(req).await;
                                 }
                                 _ => {}
                             }

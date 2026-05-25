@@ -215,9 +215,9 @@ async fn main() {
         .tools(tool_registry.tools())
         .build()
         .unwrap();
-    let (mut client, mut rx) = OpenAI::new(req).with_tool_executor(tool_registry).with_tx();
+    let (mut client, mut rx) = OpenAI::new().with_tool_executor(tool_registry).with_tx();
     tokio::spawn(async move {
-        let _res = client.run_for_result().await;
+        let _res = client.run_for_result(req).await;
         println!("\n{:?}", _res);
     });
     let mut is_reasoning = false;
