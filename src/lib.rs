@@ -74,7 +74,7 @@ impl Client<OpenAI<async_openai::Client<OpenAIConfig>>> {
 }
 
 impl<T: Provider> Provider for Client<T> {
-    fn run_for_result<'a>(&'a mut self,req:Request) -> provider::ProviderFuture<'a> {
+    fn run_for_result<'a>(&'a mut self, req: Request) -> provider::ProviderFuture<'a> {
         self.inner.run_for_result(req)
     }
 }

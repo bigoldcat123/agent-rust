@@ -43,7 +43,10 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
         (self, rx)
     }
 
-    pub(crate) fn create_chat_completion_request(&self, req: &Request) -> Result<CreateChatCompletionRequest> {
+    pub(crate) fn create_chat_completion_request(
+        &self,
+        req: &Request,
+    ) -> Result<CreateChatCompletionRequest> {
         let mut r: CreateChatCompletionRequest = req.try_into()?;
         let pre_messages = self.out_messages.iter().map(Into::into).collect::<Vec<_>>();
         r.messages.extend(pre_messages);
@@ -62,7 +65,7 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
 }
 
 impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
-    fn run_for_result<'a>(&'a mut self,req:Request) -> ProviderFuture<'a> {
+    fn run_for_result<'a>(&'a mut self, req: Request) -> ProviderFuture<'a> {
         Box::pin(async move {
             let chat = self.client.chat();
             let openai_req = self.create_chat_completion_request(&req)?;

@@ -5,6 +5,14 @@ use crate::{
     error::{Error, Result},
 };
 
+mod ask_user;
+mod shell;
+mod weather;
+
+pub use ask_user::ask_user_tool;
+pub use shell::shell_tool;
+pub use weather::weather_tool;
+
 #[derive(Debug, Clone)]
 pub struct ToolOutput {
     pub tool_call_id: String,
