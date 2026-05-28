@@ -36,8 +36,8 @@ pub trait ToolExecutor: Send {
 pub trait ToolProvider: Send {
     fn tools(&self) -> Vec<Tool>;
 }
-pub trait ToolProviderAndExecutor:ToolExecutor + ToolProvider {}
-impl <T: ToolExecutor + ToolProvider> ToolProviderAndExecutor for T {}
+pub trait ToolProviderAndExecutor: ToolExecutor + ToolProvider {}
+impl<T: ToolExecutor + ToolProvider> ToolProviderAndExecutor for T {}
 
 impl<T> ToolExecutor for Box<T>
 where

@@ -2,9 +2,9 @@ pub mod agent;
 pub mod error;
 mod message;
 pub mod provider;
+pub mod step;
 pub mod tool;
 pub mod util;
-pub mod step;
 use async_openai::config::OpenAIConfig;
 use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
@@ -13,7 +13,7 @@ use serde_json::Value;
 pub use tool::{NoopToolExecutor, ToolExecutor, ToolFn, ToolFuture, ToolOutput, ToolRegistry};
 
 use crate::tool::ToolProviderAndExecutor;
-#[derive(Builder,Clone)]
+#[derive(Builder, Clone)]
 pub struct Request {
     #[builder(setter(skip), default)]
     tools: Vec<Tool>,

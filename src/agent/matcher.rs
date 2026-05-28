@@ -246,5 +246,5 @@ async fn feature() {
         .build()
         .unwrap();
     let _res = agent.run_for_result(req).await.unwrap();
-    println!("{:?}",_res);
+    println!("{:?}", _res);
 }

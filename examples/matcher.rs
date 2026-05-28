@@ -30,6 +30,5 @@ async fn run_schedule(msg: String) -> agent::error::Result<AngentOutput> {
 
 #[tokio::main]
 async fn main() -> agent::error::Result<()> {
-
     Ok(())
 }

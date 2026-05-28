@@ -1,5 +1,6 @@
 use agent::{
-    Message, OpenAI, Provider, RequestBuilder, agent::info_colloctor::WithInfoCollectAgent, util::tui
+    Message, OpenAI, Provider, RequestBuilder, agent::info_colloctor::WithInfoCollectAgent,
+    util::tui,
 };
 use serde_json::json;
 
