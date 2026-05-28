@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::Future, pin::Pin};
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
 use crate::{
     Tool, ToolCall,
@@ -31,7 +31,7 @@ impl ToolOutput {
 pub type ToolFuture<'a> = Pin<Box<dyn Future<Output = Result<ToolOutput>> + Send + 'a>>;
 
 pub trait ToolExecutor: Send {
-    fn call<'a>(&'a mut self, call: ToolCall) -> ToolFuture<'a>;
+    fn call<'a>(&'a self, call: ToolCall) -> ToolFuture<'a>;
 }
 pub trait ToolProvider: Send {
     fn tools(&self) -> Vec<Tool>;
@@ -43,7 +43,7 @@ impl<T> ToolExecutor for Box<T>
 where
     T: ToolExecutor + ?Sized,
 {
-    fn call<'a>(&'a mut self, call: ToolCall) -> ToolFuture<'a> {
+    fn call<'a>(&'a self, call: ToolCall) -> ToolFuture<'a> {
         (**self).call(call)
     }
 }
@@ -51,7 +51,7 @@ where
 pub struct NoopToolExecutor;
 
 impl ToolExecutor for NoopToolExecutor {
-    fn call<'a>(&'a mut self, call: ToolCall) -> ToolFuture<'a> {
+    fn call<'a>(&'a self, call: ToolCall) -> ToolFuture<'a> {
         Box::pin(async move { Ok(ToolOutput::new(call.id, "")) })
     }
 }
@@ -73,22 +73,33 @@ impl<F> ToolFn<F> {
 
 impl<F, Fut> ToolExecutor for ToolFn<F>
 where
-    F: FnMut(ToolCall) -> Fut + Send,
+    F: Fn(ToolCall) -> Fut + Send,
     Fut: Future<Output = Result<ToolOutput>> + Send + 'static,
 {
-    fn call<'a>(&'a mut self, call: ToolCall) -> ToolFuture<'a> {
+    fn call<'a>(&'a self, call: ToolCall) -> ToolFuture<'a> {
         Box::pin((self.f)(call))
     }
 }
 
 #[derive(Default)]
 pub struct ToolRegistry {
-    tools: HashMap<String, RegisteredTool>,
+    tools: HashMap<String, SharedRegisteredTool>,
 }
-
-struct RegisteredTool {
-    tool: Tool,
-    executor: Box<dyn ToolExecutor>,
+pub type SharedRegisteredTool = Arc<RegisteredTool>;
+pub struct RegisteredTool {
+    pub(crate) tool: Tool,
+    executor: Box<dyn ToolExecutor + Send + Sync + 'static>,
+}
+impl RegisteredTool {
+    pub fn new(
+        tool: Tool,
+        executor: impl ToolExecutor + Send + Sync + 'static,
+    ) -> SharedRegisteredTool {
+        Arc::new(Self {
+            tool,
+            executor: Box::new(executor),
+        })
+    }
 }
 
 impl ToolRegistry {
@@ -96,32 +107,8 @@ impl ToolRegistry {
         Self::default()
     }
 
-    pub fn insert(&mut self, tool: (Tool, impl ToolExecutor + 'static)) {
-        self.tools.insert(
-            tool.0.name().to_string(),
-            RegisteredTool {
-                tool: tool.0,
-                executor: Box::new(tool.1),
-            },
-        );
-    }
-
-    pub fn insert_executor(&mut self, tool: Tool, executor: impl ToolExecutor + 'static) {
-        self.tools.insert(
-            tool.name().to_string(),
-            RegisteredTool {
-                tool,
-                executor: Box::new(executor),
-            },
-        );
-    }
-
-    pub fn insert_fn<F, Fut>(&mut self, tool: Tool, f: F)
-    where
-        F: FnMut(ToolCall) -> Fut + Send + 'static,
-        Fut: Future<Output = Result<ToolOutput>> + Send + 'static,
-    {
-        self.insert_executor(tool, ToolFn::new(f));
+    pub fn insert(&mut self, tool: SharedRegisteredTool) {
+        self.tools.insert(tool.tool.name().to_string(), tool);
     }
 
     pub fn tool(&self, name: &str) -> Option<&Tool> {
@@ -134,6 +121,10 @@ impl ToolRegistry {
             .map(|entry| entry.tool.clone())
             .collect()
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.tools.is_empty()
+    }
 }
 
 impl ToolProvider for ToolRegistry {
@@ -143,13 +134,10 @@ impl ToolProvider for ToolRegistry {
 }
 
 impl ToolExecutor for ToolRegistry {
-    fn call<'a>(&'a mut self, call: ToolCall) -> ToolFuture<'a> {
+    fn call<'a>(&'a self, call: ToolCall) -> ToolFuture<'a> {
         Box::pin(async move {
             let name = call.name.clone();
-            let handler = self
-                .tools
-                .get_mut(&name)
-                .ok_or(Error::ToolNotFound { name })?;
+            let handler = self.tools.get(&name).ok_or(Error::ToolNotFound { name })?;
             handler.executor.call(call).await
         })
     }

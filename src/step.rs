@@ -4,7 +4,7 @@ use async_openai::config::OpenAIConfig;
 use serde_json::json;
 
 use crate::{
-    AngentOutput, Client, Message, OpenAI, Provider, Request, ToolRegistry,
+    AngentOutput, Client, Message, OpenAI, Provider, Request, RequestBuilder, ToolRegistry,
     provider::ProviderFuture, tool::ask_user_tool,
 };
 
@@ -26,23 +26,19 @@ impl Runner for JsonOutput {
     }
 }
 impl JsonOutput {
-    fn new(c: OpenAiProvider, mut req: Request) -> Self {
-        if let Some(extra) = req.extra.as_mut() {
-            if let Some(e) = extra.as_object_mut() {
-                e.insert(
-                    "response_format".into(),
-                    json!({
-                        "type":"json_object"
-                    }),
-                );
-            }
-        } else {
-            req.extra = Some(json!({
+    fn new(c: OpenAiProvider) -> Self {
+        let req = RequestBuilder::default()
+            .messages(vec![Message::system(
+                "你会收到 用户的年龄 名字和爱好请你 返回json  {name,age,hobby}",
+            )])
+            .extra(json!({
                 "response_format":{
                     "type":"json_object"
                 }
             }))
-        }
+            .build()
+            .unwrap();
+
         Self {
             inner: c,
             request: req,
@@ -70,17 +66,20 @@ struct InfoCollectorLayer {
     req: Request,
 }
 impl InfoCollectorLayer {
-    fn new(req: Request) -> Self {
+    fn new() -> Self {
+        let req = RequestBuilder::default()
+            .messages(vec![Message::system("你是一个信息收集者，你会收集用户的名字 年龄 爱好，如果用户没有输入这三个信息， 请你询问用户， 并输出这三个信息，")
+            ])
+            .tools(vec![ask_user_tool()])
+            .build()
+            .unwrap();
         Self { req }
     }
 }
 impl<I> Layer<I> for InfoCollectorLayer {
     type Out = InfoCollector<I>;
-    fn layer(mut self, next: I) -> Self::Out {
-        let mut tool = ToolRegistry::new();
-        tool.insert(ask_user_tool());
-        self.req.tools = tool.tools();
-        InfoCollector::new(Client::new().with_tool_executor(tool), next, self.req)
+    fn layer(self, next: I) -> Self::Out {
+        InfoCollector::new(Client::new(), next, self.req)
     }
 }
 impl<N> InfoCollector<N> {
@@ -97,7 +96,7 @@ trait Layer<Inner> {
     fn layer(self, next: Inner) -> Self::Out;
 }
 
-struct Identity {}
+pub struct Identity {}
 impl<L> Layer<L> for Identity {
     type Out = L;
     fn layer(self, next: L) -> Self::Out {
@@ -149,29 +148,15 @@ impl LayerBuilder<Identity> {
 
 #[cfg(test)]
 mod tests {
-    use tower::Layer;
-
-    use crate::RequestBuilder;
 
     use super::*;
 
     #[tokio::test]
     async fn test_name() {
-        let req = RequestBuilder::default()
-            .messages(vec![Message::system("你是一个信息收集者，你会收集用户的名字 年龄 爱好，如果用户没有输入这三个信息， 请你询问用户， 并输出这三个信息，")
-            ])
-            .build()
-            .unwrap();
-        let req2 = RequestBuilder::default()
-            .messages(vec![Message::system(
-                "你会收到 用户的年龄 名字和爱好请你 返回json  {name,age,hobby}",
-            )])
-            .build()
-            .unwrap();
         let mut out = LayerBuilder::new()
-            .layer(InfoCollectorLayer::new(req))
-            .output(JsonOutput::new(Client::new(), req2));
-        let res = out.run("给我信息,我是大佬猫".into()).await.unwrap();
+            .layer(InfoCollectorLayer::new())
+            .output(JsonOutput::new(Client::new()));
+        let res = out.run("我的名字是大佬猫".into()).await.unwrap();
         println!("{:?}", res);
     }
 

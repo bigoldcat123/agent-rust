@@ -19,9 +19,14 @@ impl TryFrom<&Request> for CreateChatCompletionRequest {
         args.model(value.modle.clone())
             .messages(messages)
             .stream(true);
-
-        if !value.tools.is_empty() {
-            args.tools(value.tools.iter().map(Into::into).collect::<Vec<_>>());
+        if let Some(tools) = value.tools.clone() {
+            args.tools(
+                tools
+                    .iter()
+                    .map(|x| &x.tool)
+                    .map(Into::into)
+                    .collect::<Vec<_>>(),
+            );
         }
         if let Some(ref extra) = value.extra {
             args.extra(extra.clone());

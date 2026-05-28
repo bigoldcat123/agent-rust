@@ -5,6 +5,8 @@ pub mod provider;
 pub mod step;
 pub mod tool;
 pub mod util;
+use std::sync::Arc;
+
 use async_openai::config::OpenAIConfig;
 use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
@@ -12,17 +14,22 @@ pub use provider::{OpenAI, Provider};
 use serde_json::Value;
 pub use tool::{NoopToolExecutor, ToolExecutor, ToolFn, ToolFuture, ToolOutput, ToolRegistry};
 
-use crate::tool::ToolProviderAndExecutor;
-#[derive(Builder, Clone)]
+use crate::tool::SharedRegisteredTool;
+#[derive(Builder)]
 pub struct Request {
-    #[builder(setter(skip), default)]
-    tools: Vec<Tool>,
+    #[builder(setter(strip_option,into),default)]
+    tools: Option<Vec<SharedRegisteredTool>>,
     #[builder(default)]
     messages: Vec<Message>,
     #[builder(setter(into, strip_option), default)]
     extra: Option<Value>,
     #[builder(setter(into),default=format!("deepseek-v4-flash"))]
     modle: String,
+}
+impl Clone for Request {
+    fn clone(&self) -> Self {
+        Self { tools: self.tools.clone(), messages: self.messages.clone(), extra: self.extra.clone(), modle: self.modle.clone() }
+    }
 }
 impl Request {
     pub fn get_last_message(&self) -> Option<Message> {
@@ -105,13 +112,6 @@ impl Client<OpenAI<async_openai::Client<OpenAIConfig>>> {
         }
     }
 
-    pub fn with_tool_executor<T>(mut self, tool_executor: T) -> Self
-    where
-        T: ToolProviderAndExecutor + 'static,
-    {
-        self.inner.tool_executor = Box::new(tool_executor);
-        self
-    }
     pub fn with_tx(mut self) -> (Self, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
         let (tx, rx) = tokio::sync::mpsc::channel(1024);
         self.inner.output_part_tx = Some(tx);

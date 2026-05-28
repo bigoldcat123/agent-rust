@@ -6,9 +6,7 @@ use async_openai::{
 use futures::StreamExt;
 
 use crate::{
-    AgentOutputPart, AngentOutput, Message, Request, ToolCall,
-    error::{Error, Result},
-    tool::{NoopToolExecutor, ToolExecutor, ToolProviderAndExecutor},
+    AgentOutputPart, AngentOutput, Message, Request, ToolCall, ToolRegistry, error::{Error, Result}, tool::ToolExecutor
 };
 
 use super::{Provider, ProviderFuture};
@@ -17,7 +15,7 @@ pub struct OpenAI<C> {
     pub(crate) client: C,
     pub(crate) output_part_tx: Option<tokio::sync::mpsc::Sender<AgentOutputPart>>,
     pub(crate) out_messages: Vec<Message>,
-    pub(crate) tool_executor: Box<dyn ToolProviderAndExecutor>,
+    pub(crate) tool_executor: ToolRegistry,
 }
 
 impl OpenAI<async_openai::Client<OpenAIConfig>> {
@@ -26,17 +24,10 @@ impl OpenAI<async_openai::Client<OpenAIConfig>> {
             output_part_tx: None,
             out_messages: vec![],
             client: async_openai::Client::new(),
-            tool_executor: Box::new(NoopToolExecutor),
+            tool_executor: ToolRegistry::new(),
         }
     }
 
-    pub fn with_tool_executor<T>(mut self, tool_executor: T) -> Self
-    where
-        T: ToolProviderAndExecutor + 'static,
-    {
-        self.tool_executor = Box::new(tool_executor);
-        self
-    }
     pub fn with_tx(mut self) -> (Self, tokio::sync::mpsc::Receiver<AgentOutputPart>) {
         let (tx, rx) = tokio::sync::mpsc::channel(1024);
         self.output_part_tx = Some(tx);
@@ -72,10 +63,16 @@ impl Default for OpenAI<async_openai::Client<OpenAIConfig>> {
 
 impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
     fn run_for_result<'a>(&'a mut self, mut req: Request) -> ProviderFuture<'a> {
-        req.tools = self.tool_executor.tools();
         Box::pin(async move {
             let chat = self.client.chat();
             let openai_req = self.create_chat_completion_request(&req)?;
+            if self.tool_executor.is_empty() {
+                if let Some(tools) = req.tools.clone() {
+                    for tool in tools {
+                        self.tool_executor.insert(tool);
+                    }
+                }
+            }
             let mut stream = chat.create_stream(&openai_req).await?;
             let mut reasonging = String::new();
             let mut content = String::new();

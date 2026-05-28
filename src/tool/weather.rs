@@ -2,11 +2,11 @@ use serde_json::json;
 
 use crate::{
     Tool, ToolCall,
-    tool::{ToolExecutor, ToolFn, ToolOutput},
+    tool::{RegisteredTool, SharedRegisteredTool, ToolFn, ToolOutput},
 };
 
-pub fn weather_tool() -> (Tool, impl ToolExecutor) {
-    (
+pub fn weather_tool() -> SharedRegisteredTool {
+    RegisteredTool::new(
         Tool::new(
             "get_weather",
             Some("get the weather info ".to_string()),

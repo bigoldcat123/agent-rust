@@ -4,11 +4,11 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, stdin, stdout};
 use crate::{
     Tool, ToolCall,
     error::Error,
-    tool::{ToolExecutor, ToolFn, ToolOutput},
+    tool::{RegisteredTool, SharedRegisteredTool, ToolFn, ToolOutput},
 };
 
-pub fn ask_user_tool() -> (Tool, impl ToolExecutor) {
-    (
+pub fn ask_user_tool() -> SharedRegisteredTool {
+    RegisteredTool::new(
         Tool::new(
             "ask_user",
             Some(

@@ -35,15 +35,14 @@ impl<C: Provider + Send> Provider for InfoCollectAgent<C> {
                 req.get_last_message()
                     .ok_or(crate::error::Error::MissingMessage)?,
             ];
-            let mut tool_registry = ToolRegistry::new();
-            tool_registry.insert(ask_user_tool());
             let c_req = RequestBuilder::default()
                 .messages(messages)
+                .tools(vec![ask_user_tool()])
                 .build()
                 .map_err(|e| crate::error::Error::RequestBuild {
                     message: e.to_string(),
                 })?;
-            let mut c = Client::new().with_tool_executor(tool_registry);
+            let mut c = Client::new();
             let res = c.run_for_result(c_req).await?;
             let (res, _) = res
                 .get_last_assistant_message()

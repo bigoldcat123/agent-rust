@@ -4,11 +4,11 @@ use tokio::process::Command;
 use crate::{
     Tool, ToolCall,
     error::Error,
-    tool::{ToolExecutor, ToolFn, ToolOutput},
+    tool::{RegisteredTool, SharedRegisteredTool, ToolFn, ToolOutput},
 };
 
-pub fn shell_tool() -> (Tool, impl ToolExecutor) {
-    (
+pub fn shell_tool() -> SharedRegisteredTool {
+    RegisteredTool::new(
         Tool::new(
             "shell",
             Some("Execute a shell command and return stdout, stderr, and exit status.".to_string()),

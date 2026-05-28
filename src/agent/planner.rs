@@ -14,9 +14,6 @@ impl<C: Provider + Send> Provider for PlanAgent<C> {
     fn run_for_result<'a>(&'a mut self, mut req: Request) -> crate::provider::ProviderFuture<'a> {
         Box::pin(async move {
             let user_message = req.get_last_user_message()?;
-            let mut tool_registory = ToolRegistry::new();
-            let ask_user = ask_user_tool();
-            tool_registory.insert_executor(ask_user.0, ask_user.1);
             let messages = vec![
                 Message::assistant(
                     "你是一个计划小能手，你会根据用户的输入来做一份详细的任务计划书，同时你将会使用ask_user工具来询问用户任何不明白的问题。你不需要执行任务，你只需要做计划即可。",
@@ -27,11 +24,12 @@ impl<C: Provider + Send> Provider for PlanAgent<C> {
             ];
             let plan_req = RequestBuilder::default()
                 .messages(messages)
+                .tools(vec![ask_user_tool()])
                 .build()
                 .map_err(|e| crate::error::Error::RequestBuild {
                     message: e.to_string(),
                 })?;
-            let mut agent = OpenAI::new().with_tool_executor(tool_registory);
+            let mut agent = OpenAI::new();
             let (content, _) = agent
                 .run_for_result(plan_req)
                 .await?
