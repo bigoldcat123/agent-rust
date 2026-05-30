@@ -22,13 +22,13 @@ pub fn ask_user_tool() -> SharedRegisteredTool {
                         "type": "string",
                         "description": "The question to ask the user."
                     },
-                    "options": {
-                        "type": "array",
-                        "description": "Optional preset answers. The user can type a number or enter a custom answer.",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
+                    // "options": {
+                    //     "type": "array",
+                    //     "description": "Optional preset answers. The user can type a number or enter a custom answer.",
+                    //     "items": {
+                    //         "type": "string"
+                    //     }
+                    // }
                 },
                 "required": ["question"]
             })),

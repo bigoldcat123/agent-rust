@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::{
     AngentOutput, Client, Message, OpenAI, Provider, Request, RequestBuilder, ToolRegistry,
-    provider::ProviderFuture, tool::ask_user_tool,
+    error::Error, provider::ProviderFuture, tool::ask_user_tool,
 };
 
 trait Runner {
@@ -19,6 +19,7 @@ struct JsonOutput {
 }
 impl Runner for JsonOutput {
     fn run<'a>(&'a mut self, raw_input: String) -> ProviderFuture<'a> {
+        println!("{:?}",raw_input);
         let mut req = self.request.clone();
         req.messages_mut().push(Message::user_text(raw_input));
         let req = self.inner.run_for_result(req);
@@ -29,7 +30,7 @@ impl JsonOutput {
     fn new(c: OpenAiProvider) -> Self {
         let req = RequestBuilder::default()
             .messages(vec![Message::system(
-                "你会收到 用户的年龄 名字和爱好请你 返回json  {name,age,hobby}",
+                "你会收到 用户的年龄 名字和爱好请你 返回json  {name,age,hobby,weather}",
             )])
             .extra(json!({
                 "response_format":{
@@ -44,6 +45,52 @@ impl JsonOutput {
             request: req,
         }
     }
+}
+
+macro_rules! source_code {
+    ($name:ident,$layer_name:ident,$prompt:expr,$($tools:expr),* $(,)*) => {
+        struct $name<N> {
+            inner: OpenAiProvider,
+            next: N,
+            request: Request,
+        }
+        impl<N: Runner + Send> Runner for $name<N> {
+            fn run<'a>(&'a mut self, raw_input: String) -> ProviderFuture<'a> {
+                println!("{:?}",raw_input);
+                Box::pin(async move {
+                    let mut req = self.request.clone();
+                    req.messages_mut().push(Message::user_text(raw_input));
+                    let req = self.inner.run_for_result(req);
+                    let raw_input = req.await?.get_last_assistant_message().unwrap().0;
+                    self.next.run(raw_input).await
+                })
+            }
+        }
+        struct $layer_name {
+            req: Request,
+        }
+        impl $layer_name {
+            fn new() -> Self {
+                let req = RequestBuilder::default()
+                    .messages(vec![Message::system($prompt)
+                    ])
+                    .tools(vec![$($tools,)*])
+                    .build()
+                    .unwrap();
+                Self { req }
+            }
+        }
+        impl<I> Layer<I> for $layer_name {
+            type Out = $name<I>;
+            fn layer(self, next: I) -> Self::Out {
+                $name {
+                    inner: Client::new(),
+                    next: next,
+                    request: self.req,
+                }
+            }
+        }
+    };
 }
 
 struct InfoCollector<N> {
@@ -120,15 +167,15 @@ where
     }
 }
 
-struct LayerBuilder<L> {
+struct WorkFlowBuilder<L> {
     inner: L,
 }
-impl<L> LayerBuilder<L> {
-    fn layer<Outer>(self, layer: Outer) -> LayerBuilder<Stack<L, Outer>> {
-        LayerBuilder {
+impl<L> WorkFlowBuilder<L> {
+    fn layer<Outer>(self, layer: Outer) -> WorkFlowBuilder<Stack<Outer,L>> {
+        WorkFlowBuilder {
             inner: Stack {
-                inner: self.inner,
-                outer: layer,
+                inner: layer,
+                outer: self.inner,
             },
         }
     }
@@ -138,51 +185,95 @@ impl<L> LayerBuilder<L> {
     {
         self.inner.layer(s)
     }
+    fn switch<S>(self, s: S) -> L::Out
+    where
+        L: Layer<S>,
+    {
+        self.inner.layer(s)
+    }
 }
 
-impl LayerBuilder<Identity> {
+impl WorkFlowBuilder<Identity> {
     fn new() -> Self {
         Self { inner: Identity {} }
+    }
+}
+
+struct Switch<Yes, No> {
+    yes_branch: Yes,
+    no_branch: No,
+}
+impl<Yes, No> Switch<Yes, No> {
+    fn new(yes: Yes, no: No) -> Self {
+        Self {
+            yes_branch: yes,
+            no_branch: no,
+        }
+    }
+}
+impl<Yes, No> Runner for Switch<Yes, No>
+where
+    Yes: Runner + Send,
+    No: Runner + Send,
+{
+    fn run<'a>(&'a mut self, raw_input: String) -> ProviderFuture<'a> {
+        Box::pin(async move {
+            match raw_input.as_str() {
+                "Yes" => self.yes_branch.run(raw_input).await,
+                _ => self.no_branch.run(raw_input).await,
+            }
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
 
+    use crate::tool::{shell_tool, weather_tool};
+
     use super::*;
+    #[tokio::test]
+    async fn test_switc2h() {
+        source_code!(
+            Hello,
+            HelloLayer,
+            "你是一个信息收集者，你会收集用户的名字 年龄 爱好，如果用户没有输入这三个信息， 请你询问用户， 并输出这三个信息，请你使用ask_user_tool 来询问用户",
+            ask_user_tool()
+        );
+        source_code!(
+            Weather,
+            WeatherLayer,
+            "你是一个天气查询者，你会无视用户的输入，并且使用weather_tool 来查询 北京的天气信息，并且吧用户的原始输入 和你的答案一起输出",
+            weather_tool()
+        );
+        let h = HelloLayer::new();
+        let mut out = WorkFlowBuilder::new()
+            .layer(WeatherLayer::new())
+            .layer(h)
+            .output(JsonOutput::new(Client::new()));
+        let res = out.run("信息获取".into()).await.unwrap();
+        println!("{}", res.get_last_assistant_message().unwrap().0)
+    }
 
     #[tokio::test]
-    async fn test_name() {
-        let mut out = LayerBuilder::new()
+    async fn test_switch() {
+        let mut out = WorkFlowBuilder::new()
             .layer(InfoCollectorLayer::new())
             .output(JsonOutput::new(Client::new()));
         let res = out.run("我的名字是大佬猫".into()).await.unwrap();
         println!("{:?}", res);
     }
 
-    // #[test]
-    // fn test_name() {
-    //     let out = LayerBuilder::new()
-    //         .layer(IncocollectLayer::new())
-    //         .match(Match::new(
-    //             LayerBuilder::new()
-    //                 .layer(..)
-    //                 .layer(..)
-    //                 .output(..),
-    //             LayerBuilder::new()
-    //                 .layer(..)
-    //                 .layer(..)
-    //                 .match(Match2::new(
-    //                     LayerBuilder::new()
-    //                         .layer(..)
-    //                         .layer(..)
-    //                         .output(..),
-    //                     LayerBuilder::new()
-    //                         .layer(..)
-    //                         .layer(..)
-    //                         .output(..)
-    //                 ))
-    //         ))
-    //         .unwrap();
-    // }
+    #[tokio::test]
+    async fn test_name() {
+        let yes = WorkFlowBuilder::new().output(JsonOutput::new(Client::new()));
+        let no = WorkFlowBuilder::new()
+            .layer(InfoCollectorLayer::new())
+            .output(JsonOutput::new(Client::new()));
+        let mut out = WorkFlowBuilder::new()
+            .layer(InfoCollectorLayer::new())
+            .switch(Switch::new(yes, no));
+        let res = out.run("我的名字是大佬猫".into()).await.unwrap();
+        println!("{:?}", res);
+    }
 }
