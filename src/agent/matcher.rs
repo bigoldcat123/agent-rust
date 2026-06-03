@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::{AngentOutput, Client, Message, Provider, Request, RequestBuilder};
+#[cfg(test)]
+use crate::Client;
+use crate::{AngentOutput, Message, Provider, Request, RequestBuilder};
 
 pub trait MatchAgentBranchResult {
     fn into_match_agent_result(self) -> crate::error::Result<AngentOutput>;
@@ -204,11 +206,11 @@ impl<C: Provider + Send> Provider for MacherAgent<C> {
             let _raw_input = res.raw_input; // we need this in match branch
             match res.r#type {
                 GoodOrBad::Bad => {
-                    println!("{}", "bad");
+                    println!("bad");
                     Ok(AngentOutput { contents: vec![] })
                 }
                 GoodOrBad::Good => {
-                    println!("{}", "good");
+                    println!("good");
                     Ok(AngentOutput { contents: vec![] })
                 }
             }

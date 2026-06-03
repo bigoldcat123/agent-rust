@@ -91,10 +91,7 @@ pub struct RegisteredTool {
     executor: Box<dyn ToolExecutor + Send + Sync + 'static>,
 }
 impl RegisteredTool {
-    pub fn new(
-        tool: Tool,
-        executor: impl ToolExecutor + Send + Sync + 'static,
-    ) -> SharedRegisteredTool {
+    pub fn new(tool: Tool, executor: impl ToolExecutor + Sync + 'static) -> SharedRegisteredTool {
         Arc::new(Self {
             tool,
             executor: Box::new(executor),

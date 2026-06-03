@@ -1,31 +1,36 @@
-use std::{os::unix::raw, pin::Pin};
-
+#[cfg(test)]
 use async_openai::config::OpenAIConfig;
+#[cfg(test)]
 use serde_json::json;
 
+#[cfg(test)]
 use crate::{
-    AngentOutput, Client, Message, OpenAI, Provider, Request, RequestBuilder, ToolRegistry,
-    error::Error, provider::ProviderFuture, tool::ask_user_tool,
+    Client, Message, OpenAI, Provider, Request, RequestBuilder, provider::ProviderFuture,
+    tool::ask_user_tool,
 };
 
+#[cfg(test)]
 trait Runner {
     fn run<'a>(&'a mut self, raw_input: String) -> ProviderFuture<'a>;
 }
 
+#[cfg(test)]
 type OpenAiProvider = Client<OpenAI<async_openai::Client<OpenAIConfig>>>;
+#[cfg(test)]
 struct JsonOutput {
     inner: OpenAiProvider,
     request: Request,
 }
+#[cfg(test)]
 impl Runner for JsonOutput {
     fn run<'a>(&'a mut self, raw_input: String) -> ProviderFuture<'a> {
-        println!("{:?}",raw_input);
+        println!("{:?}", raw_input);
         let mut req = self.request.clone();
         req.messages_mut().push(Message::user_text(raw_input));
-        let req = self.inner.run_for_result(req);
-        req
+        self.inner.run_for_result(req)
     }
 }
+#[cfg(test)]
 impl JsonOutput {
     fn new(c: OpenAiProvider) -> Self {
         let req = RequestBuilder::default()
@@ -47,6 +52,7 @@ impl JsonOutput {
     }
 }
 
+#[cfg(test)]
 macro_rules! source_code {
     ($name:ident,$layer_name:ident,$prompt:expr,$($tools:expr),* $(,)*) => {
         struct $name<N> {
@@ -93,11 +99,13 @@ macro_rules! source_code {
     };
 }
 
+#[cfg(test)]
 struct InfoCollector<N> {
     inner: OpenAiProvider,
     next: N,
     request: Request,
 }
+#[cfg(test)]
 impl<N: Runner + Send> Runner for InfoCollector<N> {
     fn run<'a>(&'a mut self, raw_input: String) -> ProviderFuture<'a> {
         Box::pin(async move {
@@ -109,9 +117,11 @@ impl<N: Runner + Send> Runner for InfoCollector<N> {
         })
     }
 }
+#[cfg(test)]
 struct InfoCollectorLayer {
     req: Request,
 }
+#[cfg(test)]
 impl InfoCollectorLayer {
     fn new() -> Self {
         let req = RequestBuilder::default()
@@ -123,12 +133,14 @@ impl InfoCollectorLayer {
         Self { req }
     }
 }
+#[cfg(test)]
 impl<I> Layer<I> for InfoCollectorLayer {
     type Out = InfoCollector<I>;
     fn layer(self, next: I) -> Self::Out {
         InfoCollector::new(Client::new(), next, self.req)
     }
 }
+#[cfg(test)]
 impl<N> InfoCollector<N> {
     fn new(c: OpenAiProvider, n: N, req: Request) -> Self {
         Self {
@@ -138,12 +150,15 @@ impl<N> InfoCollector<N> {
         }
     }
 }
+#[cfg(test)]
 trait Layer<Inner> {
     type Out;
     fn layer(self, next: Inner) -> Self::Out;
 }
 
+#[cfg(test)]
 pub struct Identity {}
+#[cfg(test)]
 impl<L> Layer<L> for Identity {
     type Out = L;
     fn layer(self, next: L) -> Self::Out {
@@ -151,10 +166,12 @@ impl<L> Layer<L> for Identity {
     }
 }
 
+#[cfg(test)]
 struct Stack<Inner, Outer> {
     inner: Inner,
     outer: Outer,
 }
+#[cfg(test)]
 impl<Inner, Outer, S> Layer<S> for Stack<Inner, Outer>
 where
     Inner: Layer<S>,
@@ -167,11 +184,13 @@ where
     }
 }
 
+#[cfg(test)]
 struct WorkFlowBuilder<L> {
     inner: L,
 }
+#[cfg(test)]
 impl<L> WorkFlowBuilder<L> {
-    fn layer<Outer>(self, layer: Outer) -> WorkFlowBuilder<Stack<Outer,L>> {
+    fn layer<Outer>(self, layer: Outer) -> WorkFlowBuilder<Stack<Outer, L>> {
         WorkFlowBuilder {
             inner: Stack {
                 inner: layer,
@@ -193,16 +212,19 @@ impl<L> WorkFlowBuilder<L> {
     }
 }
 
+#[cfg(test)]
 impl WorkFlowBuilder<Identity> {
     fn new() -> Self {
         Self { inner: Identity {} }
     }
 }
 
+#[cfg(test)]
 struct Switch<Yes, No> {
     yes_branch: Yes,
     no_branch: No,
 }
+#[cfg(test)]
 impl<Yes, No> Switch<Yes, No> {
     fn new(yes: Yes, no: No) -> Self {
         Self {
@@ -211,6 +233,7 @@ impl<Yes, No> Switch<Yes, No> {
         }
     }
 }
+#[cfg(test)]
 impl<Yes, No> Runner for Switch<Yes, No>
 where
     Yes: Runner + Send,
@@ -229,7 +252,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use crate::tool::{shell_tool, weather_tool};
+    use crate::tool::weather_tool;
 
     use super::*;
     #[tokio::test]

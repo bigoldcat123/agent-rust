@@ -1,6 +1,4 @@
-use crate::{
-    Message, OpenAI, Provider, Request, RequestBuilder, ToolRegistry, tool::ask_user_tool,
-};
+use crate::{Message, OpenAI, Provider, Request, RequestBuilder, tool::ask_user_tool};
 
 pub struct PlanAgent<C> {
     next: C,

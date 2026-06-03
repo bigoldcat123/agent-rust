@@ -1,4 +1,4 @@
-use agent::{AngentOutput, Client, Message, Provider, RequestBuilder, match_agent};
+use agent::{AngentOutput, match_agent};
 
 match_agent! {IntentMatcher,ipt,
 Ticket => {
@@ -15,16 +15,16 @@ No => {
     run_no(ipt).await
 }}
 
-async fn run_yes(msg: String) -> agent::error::Result<AngentOutput> {
+async fn run_yes(_msg: String) -> agent::error::Result<AngentOutput> {
     unimplemented!()
 }
-async fn run_no(msg: String) -> agent::error::Result<AngentOutput> {
+async fn run_no(_msg: String) -> agent::error::Result<AngentOutput> {
     unimplemented!()
 }
-async fn run_ticket(msg: String) -> agent::error::Result<AngentOutput> {
+async fn run_ticket(_msg: String) -> agent::error::Result<AngentOutput> {
     unimplemented!()
 }
-async fn run_schedule(msg: String) -> agent::error::Result<AngentOutput> {
+async fn run_schedule(_msg: String) -> agent::error::Result<AngentOutput> {
     unimplemented!()
 }
 

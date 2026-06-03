@@ -6,7 +6,9 @@ use async_openai::{
 use futures::StreamExt;
 
 use crate::{
-    AgentOutputPart, AngentOutput, Message, Request, ToolCall, ToolRegistry, error::{Error, Result}, tool::ToolExecutor
+    AgentOutputPart, AngentOutput, Message, Request, ToolCall, ToolRegistry,
+    error::{Error, Result},
+    tool::ToolExecutor,
 };
 
 use super::{Provider, ProviderFuture};
@@ -62,15 +64,15 @@ impl Default for OpenAI<async_openai::Client<OpenAIConfig>> {
 }
 
 impl Provider for OpenAI<async_openai::Client<OpenAIConfig>> {
-    fn run_for_result<'a>(&'a mut self, mut req: Request) -> ProviderFuture<'a> {
+    fn run_for_result<'a>(&'a mut self, req: Request) -> ProviderFuture<'a> {
         Box::pin(async move {
             let chat = self.client.chat();
             let openai_req = self.create_chat_completion_request(&req)?;
-            if self.tool_executor.is_empty() {
-                if let Some(tools) = req.tools.clone() {
-                    for tool in tools {
-                        self.tool_executor.insert(tool);
-                    }
+            if self.tool_executor.is_empty()
+                && let Some(tools) = req.tools.clone()
+            {
+                for tool in tools {
+                    self.tool_executor.insert(tool);
                 }
             }
             let mut stream = chat.create_stream(&openai_req).await?;

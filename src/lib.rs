@@ -1,12 +1,12 @@
-pub mod step_builder;
 pub mod agent;
 pub mod error;
+pub mod layer;
 mod message;
 pub mod provider;
 pub mod step;
+pub mod step_builder;
 pub mod tool;
 pub mod util;
-pub mod layer;
 use async_openai::config::OpenAIConfig;
 use derive_builder::Builder;
 pub use message::{Message, ToolCall, UserMessageContent};
@@ -17,7 +17,7 @@ pub use tool::{NoopToolExecutor, ToolExecutor, ToolFn, ToolFuture, ToolOutput, T
 use crate::tool::SharedRegisteredTool;
 #[derive(Builder)]
 pub struct Request {
-    #[builder(setter(strip_option,into),default)]
+    #[builder(setter(strip_option, into), default)]
     tools: Option<Vec<SharedRegisteredTool>>,
     #[builder(default)]
     messages: Vec<Message>,
@@ -28,7 +28,12 @@ pub struct Request {
 }
 impl Clone for Request {
     fn clone(&self) -> Self {
-        Self { tools: self.tools.clone(), messages: self.messages.clone(), extra: self.extra.clone(), modle: self.modle.clone() }
+        Self {
+            tools: self.tools.clone(),
+            messages: self.messages.clone(),
+            extra: self.extra.clone(),
+            modle: self.modle.clone(),
+        }
     }
 }
 impl Request {

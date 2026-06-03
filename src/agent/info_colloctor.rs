@@ -1,7 +1,4 @@
-use crate::{
-    Client, Message, Provider, RequestBuilder, ToolRegistry, UserMessageContent,
-    tool::ask_user_tool,
-};
+use crate::{Client, Message, Provider, RequestBuilder, UserMessageContent, tool::ask_user_tool};
 
 pub struct InfoCollectAgent<C> {
     next: C,
