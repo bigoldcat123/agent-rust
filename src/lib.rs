@@ -23,7 +23,7 @@ pub struct Request {
     messages: Vec<Message>,
     #[builder(setter(into, strip_option), default)]
     extra: Option<Value>,
-    #[builder(setter(into),default=format!("deepseek-v4-flash"))]
+    #[builder(setter(into),default=format!("deepseek-v4-pro"))]
     modle: String,
 }
 impl Clone for Request {
