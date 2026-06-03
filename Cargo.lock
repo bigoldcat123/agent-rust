@@ -9,7 +9,6 @@ dependencies = [
  "async-openai",
  "derive_builder",
  "futures",
- "paste",
  "pin-project-lite",
  "serde",
  "serde_json",
@@ -21,6 +20,7 @@ dependencies = [
 [[package]]
 name = "async-openai"
 version = "0.40.2"
+source = "git+https://github.com/bigoldcat123/async-openai#c9a35060a657b087297b3273780eb349f2a85daa"
 dependencies = [
  "async-openai-macros",
  "base64",
@@ -47,6 +47,7 @@ dependencies = [
 [[package]]
 name = "async-openai-macros"
 version = "0.3.0"
+source = "git+https://github.com/bigoldcat123/async-openai#c9a35060a657b087297b3273780eb349f2a85daa"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -783,12 +784,6 @@ name = "openssl-probe"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
-
-[[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "percent-encoding"
