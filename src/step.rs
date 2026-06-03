@@ -1,9 +1,7 @@
 use async_openai::config::OpenAIConfig;
 use serde_json::json;
 
-use crate::{
-    Client, Message, OpenAI, Provider, Request, RequestBuilder, provider::ProviderFuture,
-};
+use crate::{Client, Message, OpenAI, Provider, Request, RequestBuilder, provider::ProviderFuture};
 
 pub trait Runner {
     fn run<'a>(&'a mut self, raw_input: String) -> ProviderFuture<'a>;
