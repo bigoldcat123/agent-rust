@@ -12,17 +12,18 @@
 
 - Rust 2024 edition
 - Tokio runtime
-- 可用的大模型 API 环境变量，按你的 `async-openai` 配置提供
-
-注意：当前 `Cargo.toml` 中的 `async-openai` 是本地 path 依赖：
-
-```toml
-async-openai = { path = "/Users/dadigua/Desktop/c/async-openai/async-openai", features = ["chat-completion"] }
-```
-
-如果在另一台机器上运行，需要把这个路径改成可用的本地路径或 crates.io/git 依赖。
+- 可用的大模型 API 环境变量：
+  - `OPENAI_BASE_URL`
+  - `OPENAI_API_KEY`
 
 ## Quick Start
+
+先设置运行所需的环境变量：
+
+```bash
+export OPENAI_BASE_URL="https://your-api-base-url"
+export OPENAI_API_KEY="your-api-key"
+```
 
 运行主程序：
 
@@ -37,14 +38,6 @@ cargo run --example step_info_weather
 cargo run --example step_switch
 ```
 
-开发检查：
-
-```bash
-cargo fmt
-cargo clippy
-cargo clippy --examples
-cargo test --no-run
-```
 
 ## Basic Usage
 
